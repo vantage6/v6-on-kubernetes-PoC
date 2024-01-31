@@ -1,0 +1,7 @@
+
+
+docker build . -t hectorcadavid/dummy-node-x86
+docker push hectorcadavid/dummy-node-x86
+
+
+kubectl apply -f dummy_node.yaml
