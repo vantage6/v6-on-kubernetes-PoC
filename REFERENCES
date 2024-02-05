@@ -1,0 +1,46 @@
+
+Original Docker_manager/run
+https://github.com/vantage6/vantage6/blob/8fa42bb1bb0c4357e71c2a7a2bb7b0ff8fb28d7f/vantage6-node/vantage6/node/docker/docker_manager.py#L389
+
+How I/O works: volumes mounted
+https://old-docs.vantage6.ai/algorithm-development/concepts/input-and-output
+
+task-specific folder is created within the node-defined tasks-dir
+https://github.com/vantage6/vantage6/blob/0380363534596e9898ac31a7a6953474349e1ce4/vantage6-node/vantage6/node/docker/task_manager.py#L366
+
+Node: listen for new events
+	When new event:
+		__start_task (https://github.com/vantage6/vantage6/blob/3bef8072a5f28c62d28ba30b084a48be3c4156f2/vantage6-node/vantage6/node/__init__.py#L316)
+
+		__docker.create_volume
+
+task_manager - _make_task_folders
+https://github.com/vantage6/vantage6/blob/0380363534596e9898ac31a7a6953474349e1ce4/vantage6-node/vantage6/node/docker/task_manager.py#L351
+
+Creating files
+https://github.com/vantage6/vantage6/blob/0380363534596e9898ac31a7a6953474349e1ce4/vantage6-node/vantage6/node/docker/task_manager.py#L367
+
+The algorithm wrapper stores the file:
+https://github.com/vantage6/vantage6/blob/0380363534596e9898ac31a7a6953474349e1ce4/vantage6-algorithm-tools/vantage6/algorithm/tools/wrap.py#L13
+
+https://github.com/vantage6/vantage6/blob/a759f540c731a19d351c82b414b729b303ad7aa3/vantage6-node/vantage6/node/docker/task_manager.py#L348 
+# FIXME: We should have a separate mount/volume for this. At the
+        #   moment this is a potential leak as containers might access input,
+        #   output and token from other containers.
+        #
+        #   This was not possible yet as mounting volumes from containers
+        #   is terrible when working from windows (as you have to convert
+        #   from windows to unix several times...).
+
+        # If we're running in docker __tasks_dir will point to a location on
+        # the data volume.
+        # Alternatively, if we're not running in docker it should point to the
+        # folder on the host that can act like a data volume. In both cases,
+        # we can just copy the required files to it
+
+
+Temporary volume 
+https://github.com/vantage6/vantage6/blob/a054513a8fc8e4ca33f395faba6e503c70aa7c27/vantage6-node/vantage6/node/__init__.py#L336
+
+Loading databases/input files defined in the configuration
+https://github.com/vantage6/vantage6/blob/a054513a8fc8e4ca33f395faba6e503c70aa7c27/vantage6/vantage6/cli/node/start.py#L265
