@@ -95,7 +95,7 @@ The other artifacts in this repository are below described:
 	server_ip: 127.0.0.1
 	
 	# port
-	port: 6000
+	port: 5000
 	```
 
 
@@ -107,115 +107,87 @@ The other artifacts in this repository are below described:
 	pip install -r requirements.txt
 	```
 
-6. Run the 'dummy-server':
+8. Run the 'dummy-server':
 
 	```
 	cd dummy_socketio_server
 	python simple_sio_server.py
 	```
 
-7. You will now launch the Node as a Deployment POD through the kubectl command (in future iterations this would be done programatically). For this, you first need to update some volume-binding settings of the POD configuration so it is consistent with the vantage6 'task-dir' setting. The POD configuration also requires to define the location of the Kubernetes and vantage6 configuration file. If the steps for setting up microK8S where followed, this configuration file is located at $HOME/.kube/config.
+9. You will now launch the Node as a Deployment POD through the kubectl command (in future iterations this would be done programatically). For this, you first need to update some volume-binding settings of the POD configuration so it is consistent with the vantage6 'task-dir' setting. The POD configuration also requires to define the location of the Kubernetes and vantage6 configuration file. If the steps for setting up microK8S where followed, this configuration file is located at $HOME/.kube/config.
 
 
-```
-volumes:
- - name: task-files-root
-   hostPath:
-     path: 	/<ouput_path>/tasks
- - name: kube-config-file
-   hostPath:
-     path: /home/myhome/.kube/config   
- - name: v6-node-config-file
-   hostPath:
-     path: /home/myhome/<clone_path>/v6-Kubernetes-PoC/node_poc/node_config.yaml
+	```
+	volumes:
+	 - name: task-files-root
+	   hostPath:
+	     path: 	/<ouput_path>/tasks
+	 - name: kube-config-file
+	   hostPath:
+	     path: /home/myhome/.kube/config   
+	 - name: v6-node-config-file
+	   hostPath:
+	     path: /home/myhome/<clone_path>/v6-Kubernetes-PoC/node_poc/node_config.yaml
+	```
+
+10. __(Optional)__ Please note that you will be launching a containerized copy of the Node already published on Dockerhub (docker.io/hectorcadavid/dummy-node-x86:latest), which contains the current version of the node's source code. Once you have made changes to the Node source code, you will need to publish the new version on your own local or online registry, and update the spec/containers/image value accordingly:
 
 
-```
+	```
+	spec:
+	 containers:
+	 - name: dummy-node-server
+	   image: docker.io/hectorcadavid/dummy-node-x86:latest
+	```
 
-7. Run the Node as a POD deployment.
+
+11. Start the microk8s/Kubernetes dashboard on a separate terminal (you will need to copy the login token again everytime the session expires).
+
+	```
+	microk8s dashboard-proxy
+	```
+12. Open the dashboard running on the 10443 port (https://localhost:10443/). 
+
+
+13. Run the Node as a POD deployment. Once you have done this, check in the dashboard the status of the POD and the log messages to make sure it is working correctly.
 
 	```
 	cd node_poc
 	kubectl apply -f node_pod_config.yaml
 	```
+	
+	![](img/dashboard1.png)
+	![](img/dashboard2.png)
 
-8. 
+14. Now, you can publish requests to the server, to activate a task on the Node. You can edit the sample script on `dummy_socketio_server`/`command_emitter.py`. Update the IP address and port so it matches the ones on your 'dummy' server, and define a 'payload' with a different run_id each time. 
+
+	The given example launches an 'avg' algorithm published on Dockerhub (hectorcadavid/avg-alg-x86). This algorithm depends on provisional file system conventions of the PoC: (1) all csv-DBs given on the v6 configuration file will be bound as a file on the /app/input/csv within the container, and (2) the output folder of the given 'run' will be bound to the 'app/output' folder within the container. The latter, as described in the diagram, will correspond to the directory hierarchy on the host: `<task-dir'-setting-path`>/`<run_id`>/`output`.
+
  
+	```
+	sio = socketio.Client()
+	sio.connect('http://192.168.178.185:5000')
+	
+	
+	run_cmd_payload = {
+	    "run_id": 33333312,
+	    "task_info": {"arg1":"/app/input/csv/default","arg2":"Age","arg3":"/app/output/avg.txt"},
+	    "image": "hectorcadavid/avg-alg-x86",
+	    "docker_input": "input1",
+	    "tmp_vol_name": "example-tmp-vol",
+	    "token": "example_token",
+	    "databases_to_use": ["default","db1", "db2", "db3"]
+	    }
+	
+	sio.emit('command_request',run_cmd_payload)
+	time.sleep(1)
+	sio.disconnect()
+	
+	``` 
 
-3. Setting up and launching the 'node' as a Pod deployment.
+15. Once the request is published and the Node processes it, you can check the status with the Kubernetes dashboard. The 'avg' algorithm sleeps for 1 minute so you have time to check the log and even open a shell terminal through the dashboard.
 
-3.1.update the node_pod_config.yaml to set the absolute path of the kubernetes configuration file (kube-config-file), and the absolute path of the v6 config file (the one included in this repo)
-
-```
-volumes:
- - name: task-files-root
-   hostPath:
-     path: /tmp/tasks
- - name: kube-config-file
-   hostPath:
-     path: /home/hcadavid/.kube/config   
- - name: v6-node-config-file
-   hostPath:
-     path: /home/hcadavid/k8s/v6-Kubernetes-PoC/node_poc/node_config.yaml
-```
- 
-
-3. from the node_poc
-
-```
-kubectl apply -f node_pod_config.yaml
-```
-
-4. Check the POD on the dashboard - https://<hostname>:10443
-
-5. send a request to the node by posting an event on the socketio server. Use the code snipped command-emitter.py
-
-6. Check the files
+ ![](img/dashboard-alg-io.png)
 
 
-
-
-
-# Proof of Concept for Vantage6 Node Refactor
-
-This repository contains a proof of concept for a potential architecture refactor for the Vantage6 platform, focusing specifically on the Node component and how it handles containerized algorithms.
-
-## Overview
-
-Vantage6 is a federated learning platform where Nodes execute algorithms on local data and communicate results to a central server. The Node component is complex, responsible for various tasks including algorithm execution, container isolation, and communication with other components [0][1].
-
-## Objective
-
-The goal of this project is to explore a change to the core aspect of how the Node component manages containerized algorithms. To ensure the stability of the entire platform, we will conduct experiments and validation on a simplified version of the Node component.
-
-## Experiment Setup
-
-We have set up a controlled environment to simulate the behavior of the Node component within the Vantage6 framework. This environment allows us to isolate and observe the effects of our proposed changes without impacting the live system.
-
-## Proposed Changes
-
-Our proposed changes aim to enhance the efficiency and security of the Node's algorithm handling process. We are considering improvements in areas such as container management, resource allocation, and error handling.
-
-## Validation Process
-
-Once the proposed changes are implemented, we will run a series of tests to validate their performance and compatibility with the existing Vantage6 architecture. These tests will cover various scenarios, including but not limited to:
-
-- Load testing to assess performance under heavy computational load.
-- Security testing to ensure data integrity and confidentiality.
-- Integration testing to verify seamless interaction with other components.
-
-## Getting Started
-
-To experiment with the changes, clone this repository and follow the instructions in the `README.md` files within each subdirectory. You will need to have Python and Docker installed on your machine to run the simulations.
-
-## Contributing
-
-Contributions are welcome! If you find issues with the current implementation or have suggestions for improvements, please open an issue or submit a pull request.
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the `LICENSE` file for details.
-
-## Contact
-
-For further inquiries, please contact the project maintainers at [insert contact email or link here].
+16. Now you can check the output files created by the algorithms on the host.

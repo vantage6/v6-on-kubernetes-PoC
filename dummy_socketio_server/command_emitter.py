@@ -12,7 +12,7 @@ run_cmd_payload = {
     "docker_input": "input1",
     "tmp_vol_name": "example-tmp-vol",
     "token": "example_token",
-    "databases_to_use": ["db1", "db2", "db3"]
+    "databases_to_use": ["default","db1", "db2", "db3"]
     }
 
 sio.emit('command_request',run_cmd_payload)
