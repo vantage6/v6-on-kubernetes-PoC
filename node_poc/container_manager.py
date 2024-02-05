@@ -48,66 +48,6 @@ class ContainerManager:
         return 0
 
 
-    def _create_host_path_persistent_volume(self,path:str)->None:
-        pv = client.V1PersistentVolume(
-            metadata=client.V1ObjectMeta(name='task-pv-volume', labels={'type': 'local'}),
-            spec=client.V1PersistentVolumeSpec(
-                storage_class_name='manual',
-                capacity={'storage': '10Gi'},
-                access_modes=['ReadWriteOnce'],
-                host_path=client.V1HostPathVolumeSource(path=path)
-            )
-        )
-        self.core_api.create_persistent_volume(body=pv)
-
-
-
-    """"
-    This method won't be needed
-    """
-    def create_volume(self,volume_name:str)->None:
-
-        """
-        @precondition: at least one persistent volume has been provisioned in the (single) kubernetes node
-        
-        """
-
-        is_valid_vol_name = re.search("[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*",volume_name)
-
-        if not is_valid_vol_name:
-            #TODO custom exceptions to decouple codebase from kubernetes
-            raise Exception(f'Invalid volume name; {volume_name}')            
-
-        
-        #create a persistent volume claim with the given name
-        pvc = client.V1PersistentVolumeClaim(
-            api_version='v1',
-            kind='PersistentVolumeClaim',
-            metadata=client.V1ObjectMeta(name=volume_name),
-            spec=client.V1PersistentVolumeClaimSpec(
-                storage_class_name='manual',
-                access_modes=['ReadWriteOnce'],
-                resources=client.V1ResourceRequirements(
-                    #TODO Storage quota to be defined in system properties
-                    requests={'storage': '1Gi'}
-                )
-            )
-        )
-        
-        """
-        If the volume was not claimed with the given name yet, there won't be exception.
-        If the volume was already claimed with the same name, (which should not make the function to fail), 
-            the API is expected to return an 409 error code.
-        """
-        try:
-            self.core_api.create_namespaced_persistent_volume_claim('default',body=pvc)
-        except client.rest.ApiException as e:
-            if e.status != 409:
-                #TODO custom exceptions to decouple codebase from kubernetes
-                raise Exception(f"Unexpected kubernetes API error code {e.status}") from e
-
-
-
 
     def run(self, run_id: int, task_info: dict, image: str,
             docker_input: bytes, tmp_vol_name: str, token: str,
@@ -260,3 +200,217 @@ class ContainerManager:
             vol_mounts.append(_volume_mount)
 
         return volumes,vol_mounts
+    
+
+    
+    def create_volume(self,volume_name:str)->None:
+        """
+        This method creates a persistent volume through volume claims. However, this method is not being
+        used yet, as using only host_path volume binds seems to be enough and more convenient 
+        (see details on _create_volume_mounts) - this is to be discussed
+        """
+        
+        """
+        @precondition: at least one persistent volume has been provisioned in the (single) kubernetes node
+        
+        """
+
+        is_valid_vol_name = re.search("[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*",volume_name)
+
+        if not is_valid_vol_name:
+            #TODO custom exceptions to decouple codebase from kubernetes
+            raise Exception(f'Invalid volume name; {volume_name}')            
+
+        
+        #create a persistent volume claim with the given name
+        pvc = client.V1PersistentVolumeClaim(
+            api_version='v1',
+            kind='PersistentVolumeClaim',
+            metadata=client.V1ObjectMeta(name=volume_name),
+            spec=client.V1PersistentVolumeClaimSpec(
+                storage_class_name='manual',
+                access_modes=['ReadWriteOnce'],
+                resources=client.V1ResourceRequirements(
+                    #TODO Storage quota to be defined in system properties
+                    requests={'storage': '1Gi'}
+                )
+            )
+        )
+        
+        """
+        If the volume was not claimed with the given name yet, there won't be exception.
+        If the volume was already claimed with the same name, (which should not make the function to fail), 
+            the API is expected to return an 409 error code.
+        """
+        try:
+            self.core_api.create_namespaced_persistent_volume_claim('default',body=pvc)
+        except client.rest.ApiException as e:
+            if e.status != 409:
+                #TODO custom exceptions to decouple codebase from kubernetes
+                raise Exception(f"Unexpected kubernetes API error code {e.status}") from e
+
+
+
+    def _create_host_path_persistent_volume(self,path:str)->None:
+        """
+        Programatically creates a persistent volume (in case it is needed for creating a
+        volume claim). Just for reference, not currently being used.
+        """
+        pv = client.V1PersistentVolume(
+            metadata=client.V1ObjectMeta(name='task-pv-volume', labels={'type': 'local'}),
+            spec=client.V1PersistentVolumeSpec(
+                storage_class_name='manual',
+                capacity={'storage': '10Gi'},
+                access_modes=['ReadWriteOnce'],
+                host_path=client.V1HostPathVolumeSource(path=path)
+            )
+        )
+        self.core_api.create_persistent_volume(body=pv)
+
+
+    
+    #def is_docker_image_allowed(self, docker_image_name: str, task_info: dict) -> bool:
+        """
+        Checks the docker image name.
+
+        Against a list of regular expressions as defined in the configuration
+        file. If no expressions are defined, all docker images are accepted.
+
+        Parameters
+        ----------
+        docker_image_name: str
+            uri to the docker image
+        task_info: dict
+            Dictionary with information about the task
+
+        Returns
+        -------
+        bool
+            Whether docker image is allowed or not
+        """
+    
+
+    
+    #def is_running(self, run_id: int) -> bool:
+        """
+        Check if a container is already running for <run_id>.
+
+        Parameters
+        ----------
+        run_id: int
+            run_id of the algorithm container to be found
+
+        Returns
+        -------
+        bool
+            Whether or not algorithm container is running already
+        """
+
+
+    #def cleanup_tasks(self) -> list[KilledRun]:
+        """
+        Stop all active tasks
+
+        Returns
+        -------
+        list[KilledRun]:
+            List of information on tasks that have been killed
+        """
+
+
+    #def cleanup(self) -> None:
+        """
+        Stop all active tasks and delete the isolated network
+
+        Note: the temporary docker volumes are kept as they may still be used
+        by a parent container
+        """
+        # note: the function `cleanup_tasks` returns a list of tasks that were
+        # killed, but we don't register them as killed so they will be run
+        # again when the node is restarted
+
+   
+
+    #def get_result(self) -> Result:
+        """
+        Returns the oldest (FIFO) finished docker container.
+
+        This is a blocking method until a finished container shows up. Once the
+        container is obtained and the results are read, the container is
+        removed from the docker environment.
+
+        Returns
+        -------
+        Result
+            result of the docker image
+        """
+
+
+
+
+    #def login_to_registries(self, registries: list = []) -> None:
+        """
+        Login to the docker registries
+
+        Parameters
+        ----------
+        registries: list
+            list of registries to login to
+        """
+
+
+    #def link_container_to_network(self, container_name: str, config_alias: str) -> None:
+        """
+        Link a docker container to the isolated docker network
+
+        Parameters
+        ----------
+        container_name: str
+            Name of the docker container to be linked to the network
+        config_alias: str
+            Alias of the docker container defined in the config file
+        """
+
+
+    #def kill_selected_tasks(
+    #    self, org_id: int, kill_list: list[ToBeKilled] = None
+    #) -> list[KilledRun]:
+
+
+    #def kill_tasks(
+    #    self, org_id: int, kill_list: list[ToBeKilled] = None
+    #) -> list[KilledRun]:
+        """
+        Kill tasks currently running on this node.
+
+        Parameters
+        ----------
+        org_id: int
+            The organization id of this node
+        kill_list: list[ToBeKilled] (optional)
+            A list of info on tasks that should be killed. If the list
+            is not specified, all running algorithm containers will be killed.
+
+        Returns
+        -------
+        list[KilledRun]
+            List of dictionaries with information on killed tasks
+        """
+
+
+    #def get_column_names(self, label: str, type_: str) -> list[str]:
+        """
+        Get column names from a node database
+
+        Parameters
+        ----------
+        label: str
+            Label of the database
+        type_: str
+            Type of the database
+
+        Returns
+        -------
+        list[str]
+            List of column names
+        """
