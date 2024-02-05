@@ -1,6 +1,7 @@
 import socketio
 import eventlet
 import threading
+import yaml
 
 # create a Socket.IO server
 sio = socketio.Server()
@@ -30,6 +31,12 @@ def command_request(sid, data):
 
 
 if __name__ == '__main__':
+
+    with open('server_config.yaml', 'r') as file:
+        v6_config = yaml.safe_load(file)
+        print(f'v6 dummy server settings:{v6_config}')
+
+
     app = socketio.WSGIApp(sio)
-    eventlet.wsgi.server(eventlet.listen(('192.168.178.185',5000)), app)
+    eventlet.wsgi.server(eventlet.listen((v6_config['server_ip'],v6_config['port'])), app)
     print('Socket.io server running')

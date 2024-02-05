@@ -52,8 +52,12 @@ The other artifacts in this repository are below described:
 - [x] Baseline code for experiments
 - [x] Programmatically launching algorithms as job PODs, binding volumes to them, according to v6 configuration settings: ('task_dir') and ('databases').
 - [x] Kubernetes configuration for launching the node as a POD deployment, giving it access to the host's Kubernetes configuration (so it can perform further operations on Kubernetes programmatically).
-- [ ] Defining network isolation rules for the jobs as a NetworkPolicy resource.
-- [ ] 
+- [ ] Defining network isolation rules for the POD jobs as a NetworkPolicy resource. Create 'diagnostics' algorithms to check these rules.
+- [ ] Task-status related methods (getting results, listing, killing tasks, etc).
+- [ ] Include the Proxy server, and add isolation rules accordingly.
+- [ ] Communication between algorithms and the server through the Proxy.
+- [ ] Evaluation of GPU resources pass-through
+- [ ] Comparison with K3S (rootless configuration)
 
 
 ![](img/containers-POC.drawio.png)
@@ -63,16 +67,80 @@ The other artifacts in this repository are below described:
 
 1. Setup microk8s on [Linux](https://ubuntu.com/tutorials/install-a-local-kubernetes-with-microk8s#1-overview). It can be installed on [Windows](https://microk8s.io/docs/install-windows), but this PoC has been tested only on Ubuntu environments.
 
-2. Setup and enable the Kubernetes dashboard [following the microk8s guidelines](https://microk8s.io/docs/addon-dashboard).
+2. Setup and enable the Kubernetes dashboard [following the microk8s guidelines](https://microk8s.io/docs/addon-dashboard). Keep it running on a separate terminal, so you can copy the
 
-3. Edit the configuration file (the settings not yet being used are commented)
+3. Clone the repository.
 
-    ````
-    task_dir:
-    databases:
-    ```
+4. Edit the v6-node configuration file (node_poc/node_config.yaml), and update the path of the csv included in the repository, as the 'default' database.
 
-2. Run the 'dummy-server'. A simple socket.io server the node is subscribet to when launched. 
+	```
+	databases:
+	  - label: default
+	    uri: /<path>/v6-Kubernetes-PoC/csv/employees.csv
+	    type: csv
+	```
+
+5. In the same configuration file, set the 'task_dir' setting (directory where local task files are stored). Just add the path of an empty folder (Kubernetes will take care of creating the subfolders when needed!)
+
+	```
+	task_dir: /<ouput_path>/tasks
+	```
+
+
+
+6. Edit the 'dummy' server configuration file (dummy_socketio_server/server_config.yaml), and set the local IP address of the network adapter you want the server to be listening on.
+
+	```
+	# IP address of the adapter where the server will be listening to
+	server_ip: 127.0.0.1
+	
+	# port
+	port: 6000
+	```
+
+
+7. Open a terminal and create a Python virtual environment, with the needed dependencies:
+
+	```
+	python -m venv venv
+	source venv/bin/activate
+	pip install -r requirements.txt
+	```
+
+6. Run the 'dummy-server':
+
+	```
+	cd dummy_socketio_server
+	python simple_sio_server.py
+	```
+
+7. You will now launch the Node as a Deployment POD through the kubectl command (in future iterations this would be done programatically). For this, you first need to update some volume-binding settings of the POD configuration so it is consistent with the vantage6 'task-dir' setting. The POD configuration also requires to define the location of the Kubernetes and vantage6 configuration file. If the steps for setting up microK8S where followed, this configuration file is located at $HOME/.kube/config.
+
+
+```
+volumes:
+ - name: task-files-root
+   hostPath:
+     path: 	/<ouput_path>/tasks
+ - name: kube-config-file
+   hostPath:
+     path: /home/myhome/.kube/config   
+ - name: v6-node-config-file
+   hostPath:
+     path: /home/myhome/<clone_path>/v6-Kubernetes-PoC/node_poc/node_config.yaml
+
+
+```
+
+7. Run the Node as a POD deployment.
+
+	```
+	cd node_poc
+	kubectl apply -f node_pod_config.yaml
+	```
+
+8. 
+ 
 
 3. Setting up and launching the 'node' as a Pod deployment.
 
