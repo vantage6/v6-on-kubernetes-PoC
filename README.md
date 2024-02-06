@@ -50,13 +50,14 @@ The other artifacts in this repository are below described:
 ## Proof of concept status
 
 - [x] Baseline code for experiments
-- [x] Programmatically launching algorithms as job PODs, binding volumes to them, according to v6 configuration settings: ('task_dir') and ('databases').
+- [x] Programmatically launching algorithms as job PODs, binding volumes to them, according to v6 configuration settings: ('task_dir': output, tmp, token) and ('databases': input). * See diagram below.
 - [x] Kubernetes configuration for launching the node as a POD deployment, giving it access to the host's Kubernetes configuration (so it can perform further operations on Kubernetes programmatically).
 - [ ] Defining network isolation rules for the POD jobs as a NetworkPolicy resource. Create 'diagnostics' algorithms to check these rules.
 - [ ] Task-status related methods (getting results, listing, killing tasks, etc).
 - [ ] Include the Proxy server, and add isolation rules accordingly.
 - [ ] Communication between algorithms and the server through the Proxy.
 - [ ] Evaluation of GPU resources pass-through
+- [ ] Launching the node as a POD deployment programatically (so settings from v6 configuration file are used)
 - [ ] Comparison with K3S (rootless configuration)
 
 
