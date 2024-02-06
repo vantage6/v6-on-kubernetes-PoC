@@ -116,7 +116,7 @@ The other artifacts in this repository are below described:
 	python simple_sio_server.py
 	```
 
-9. You will now launch the Node as a Deployment POD through the kubectl command (in future iterations this would be done programatically). For this, you first need to update some volume-binding settings of the POD configuration so it is consistent with the vantage6 'task-dir' setting. The POD configuration also requires to define the location of the Kubernetes and vantage6 configuration file. If the steps for setting up microK8S where followed, this configuration file is located at $HOME/.kube/config.
+9. You will now launch the Node as a Deployment POD through the kubectl command (in future iterations this would be done programatically). For this, you first need to update some volume-binding settings of the Node/POD configuration file (`node_poc/node_poc_config.yaml`) so it is consistent with the vantage6 'task-dir' setting. The POD configuration also requires to define the location of the Kubernetes and vantage6 configuration file. If the steps for setting up microK8S where followed, this configuration file is located at $HOME/.kube/config.
 
 
 	```
@@ -189,7 +189,7 @@ The other artifacts in this repository are below described:
 
 15. Once the request is published and the Node processes it, you can check the status with the Kubernetes dashboard. The 'avg' algorithm sleeps for 1 minute so you have time to check the log and even open a shell terminal through the dashboard.
 
- ![](img/dashboard-alg-io.png)
+ 	![](img/dashboard-alg-io.png)
 
 
 16. Now you can check the directories structure and output files created by the Node and by the algorithms on the host. For example:
