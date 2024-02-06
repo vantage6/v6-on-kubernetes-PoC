@@ -58,7 +58,8 @@ The other artifacts in this repository are below described:
 - [ ] Communication between algorithms and the server through the Proxy.
 - [ ] Evaluation of GPU resources pass-through
 - [ ] Launching the node as a POD deployment programatically (so settings from v6 configuration file are used)
-- [ ] Comparison with K3S (rootless configuration)
+- [ ] Setup for K3S (for linux distros that do not support snap)
+- [ ] Setup for actual Kubernetes clusters (e.g., switching from HP-binds to Persistenv Volumes and volume-claims)
 
 
 ![](img/containers-POC.drawio.png)
