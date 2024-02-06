@@ -1,5 +1,5 @@
 # IP address of the adapter where the server will be listening to
-server_ip: 127.0.0.1
+server_ip: 192.168.178.185
 
 # port
-port: 6000
+port: 5000

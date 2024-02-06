@@ -90,11 +90,11 @@ The other artifacts in this repository are below described:
 
 
 
-6. Edit the 'dummy' server configuration file (dummy_socketio_server/server_config.yaml), and set the local IP address of the network adapter you want the server to be listening on.
+6. Edit the 'dummy' server configuration file (dummy_socketio_server/server_config.yaml), and set the local IP address of the network adapter you want the server to be listening on. The Node, when running within a POD, will reach this port on the given IP, so a local IP address different than localhost/127.0.0.1. is needed.
 
 	```
 	# IP address of the adapter where the server will be listening to
-	server_ip: 127.0.0.1
+	server_ip: 192.168.178.185
 	
 	# port
 	port: 5000
