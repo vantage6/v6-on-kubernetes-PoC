@@ -57,6 +57,7 @@ The other artifacts in this repository are below described:
 - [ ] Include the Proxy server, and add isolation rules accordingly.
 - [ ] Communication between algorithms and the server through the Proxy.
 - [ ] Evaluation of GPU resources pass-through & combining image types (podman, singularity)
+- [ ] Node-to-node communication through a VPN
 - [ ] Launching the node as a POD deployment programatically (so settings from v6 configuration file are used)
 - [ ] Setup for K3S (for linux distros that do not support snap)
 - [ ] Setup for actual Kubernetes clusters (e.g., switching from HP-binds to Persistenv Volumes and volume-claims)
