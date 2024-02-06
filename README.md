@@ -163,7 +163,7 @@ The other artifacts in this repository are below described:
 
 14. Now, you can publish requests to the server, to activate a task on the Node. You can edit the sample script on `dummy_socketio_server`/`command_emitter.py`. Update the IP address and port so it matches the ones on your 'dummy' server, and define a 'payload' with a different run_id each time. 
 
-	The given example launches an 'avg' algorithm published on Dockerhub (hectorcadavid/avg-alg-x86). This algorithm depends on provisional file system conventions of the PoC: (1) all csv-DBs given on the v6 configuration file will be bound as a file on the /app/input/csv within the container, and (2) the output folder of the given 'run' will be bound to the 'app/output' folder within the container. The latter, as described in the diagram, will correspond to the directory hierarchy on the host: `<task-dir'-setting-path`>/`<run_id`>/`output`.
+	The given example launches an 'avg' algorithm published on Dockerhub (hectorcadavid/avg-alg-x86). This algorithm depends on provisional file system conventions of the PoC: (1) all csv-DBs given on the v6 configuration file will be bound as a file on the /app/input/csv within the container, and (2) the output folder of the given 'run' will be bound to the 'app/output' folder within the container. The latter, as described in the diagram, will correspond to the directory hierarchy on the host: `<task-dir-setting-path`>/`<run_id`>/`output`.
 
  
 	```
@@ -192,4 +192,8 @@ The other artifacts in this repository are below described:
  ![](img/dashboard-alg-io.png)
 
 
-16. Now you can check the output files created by the algorithms on the host.
+16. Now you can check the directories structure and output files created by the Node and by the algorithms on the host. For example:
+
+	```
+	tree /<task-dir-setting-path>
+	```
