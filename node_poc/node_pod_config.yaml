@@ -5,7 +5,7 @@ metadata:
 spec:
  containers:
  - name: dummy-node-server
-   image: docker.io/hectorcadavid/dummy-node-x86:latest
+   image: docker.io/clgeng/dummy_v6_node:latest
    tty: true
    env:
    - name: HOST_IP
