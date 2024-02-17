@@ -12,6 +12,8 @@ spec:
      valueFrom:
        fieldRef:
          fieldPath: status.hostIP
+   - name: PORT
+     value: "5000"
    command: ["python", "node.py"]
    volumeMounts:
    - name: task-files-root

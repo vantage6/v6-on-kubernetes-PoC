@@ -19,6 +19,7 @@ def run_algorithm(json_input):
 
 # Get the host IP from the environment variable
 host_ip = os.environ['HOST_IP']
+port = os.environ['PORT']
 
 print(f"Starting node at {host_ip}")
 
@@ -27,7 +28,7 @@ sio = socketio.Client()
 
 @sio.event
 def connect():
-    print("Connected to server")    
+    print("Connected to server")
     sio.emit('node_connection_request', '')
 
 @sio.event
@@ -46,7 +47,7 @@ def command(data):
 
 
 if __name__ == '__main__':
-    sio.connect(f'http://{host_ip}:5000')
+    sio.connect(f'http://{host_ip}:{port}')
     sio.wait()
 
 
