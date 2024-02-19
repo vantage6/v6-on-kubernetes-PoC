@@ -3,22 +3,23 @@ import csv
 import time
 import platform
 import socket
+import requests
+import psutil
 
 
-def test_external_connectivity(ip_address='8.8.8.8', port=80):
+def get_ip_addresses(family):
+    for interface, snics in psutil.net_if_addrs().items():
+        for snic in snics:
+            if snic.family == family:
+                yield (interface, snic.address)
+
+
+def is_internet_reachable():
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)        
-        #Connection timeout
-        s.settimeout(5)
-        #Connection attempt
-        s.connect((ip_address, port))
-        
-        # If the connection is successful, close the socket and return False
-        s.close()
-        return False
-    except socket.error as e:
-        # If there's an error (which is expected if the pod is isolated), return True
+        requests.get('https://8.8.8.8', timeout=1)
         return True
+    except requests.exceptions.RequestException:
+        return False
 
 
 if __name__ == '__main__':
@@ -47,8 +48,19 @@ if __name__ == '__main__':
         txt_file.write(str(average))
 
 
+    ipv4s = list(get_ip_addresses(socket.AF_INET))
+    ipv6s = list(get_ip_addresses(socket.AF_INET6))
+
     print(f'Host architecture:{platform.uname()[4]}')
-    internet_connectivity = test_external_connectivity()
-    print(f'Internet access test result:{"successful(no isolation)" if internet_connectivity else "failed(isolated env.)"}')    
+    print("IPv4 Addresses:")
+    for interface, ipv4 in ipv4s:
+        print(f"{interface}: {ipv4}")
+
+    print("\nIPv6 Addresses:")
+    for interface, ipv6 in ipv6s:
+        print(f"{interface}: {ipv6}")
+
+    internet_reachable = is_internet_reachable()
+    print(f'Internet access test result:{"successful(no isolation)" if internet_reachable else "failed(isolated env.)"}')    
     print('Waiting one minute before finishing the job (to simulate a more expensive task and to give you time to login on the POD)')
-    time.sleep(60)
+    time.sleep(120)

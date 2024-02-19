@@ -5,7 +5,10 @@ FROM python:3.9
 WORKDIR /app
 
 # Copy the Python script into the container
-COPY app.py /app/app.py
+COPY *.py reqs.txt /app/
+
+# Install python dependencies
+RUN pip install -r reqs.txt
 
 # Set the entrypoint to the Python script
 ENTRYPOINT ["python", "app.py"]
