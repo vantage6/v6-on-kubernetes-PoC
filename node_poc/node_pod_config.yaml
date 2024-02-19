@@ -5,13 +5,15 @@ metadata:
 spec:
  containers:
  - name: dummy-node-server
-   image: docker.io/hectorcadavid/dummy-node-x86:latest
+   image: docker.io/clgeng/dummy_v6_node:latest
    tty: true
    env:
    - name: HOST_IP
      valueFrom:
        fieldRef:
          fieldPath: status.hostIP
+   - name: PORT
+     value: "5000"
    command: ["python", "node.py"]
    volumeMounts:
    - name: task-files-root
