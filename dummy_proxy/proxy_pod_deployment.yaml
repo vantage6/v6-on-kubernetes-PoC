@@ -1,20 +1,15 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Pod
 metadata:
-  name: flask-deployment
+  name: dummy-proxy-pod
   namespace: v6-jobs
+  labels:
+    app: dummy-v6-proxy
 spec:
-  replicas:  3
-  selector:
-    matchLabels:
-      app: flask-app
-  template:
-    metadata:
-      labels:
-        app: flask-app
-    spec:
-      containers:
-      - name: flask-app
-        image: your-image-name
-        ports:
-        - containerPort:  8080
+  hostname: v6proxy
+  subdomain: k8snet
+  containers:
+  - name: dummy-v6-proxy
+    image: hectorcadavid/dummy-v6-server-proxy
+    ports:
+    - containerPort:  8080
