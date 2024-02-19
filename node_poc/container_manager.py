@@ -119,7 +119,7 @@ class ContainerManager:
             ),
         )
 
-        self.batch_api.create_namespaced_job(namespace="v6-pod", body=job)
+        self.batch_api.create_namespaced_job(namespace="v6-jobs", body=job)
 
 
 
@@ -243,7 +243,7 @@ class ContainerManager:
             the API is expected to return an 409 error code.
         """
         try:
-            self.core_api.create_namespaced_persistent_volume_claim('v6-pods',body=pvc)
+            self.core_api.create_namespaced_persistent_volume_claim('v6-jobs',body=pvc)
         except client.rest.ApiException as e:
             if e.status != 409:
                 #TODO custom exceptions to decouple codebase from kubernetes
