@@ -16,8 +16,9 @@ spec:
     - protocol: TCP
       port:  8080 # Assuming the dummy-v6-proxy pod listens on port  8080
   - to:
+    - namespaceSelector: {} # allow only the use DNS within the cluster
     ports:
-    - protocol: UDP
+    - protocol: UDP #This enables internal DNS resolution (otherwhise the static IP addresses of the proxy should be given)
       port: 53
 
 ---
