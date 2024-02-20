@@ -7,10 +7,24 @@ metadata:
     app: dummy-v6-proxy
 spec:
   hostname: v6proxy
-  subdomain: k8snet
+  subdomain: v6proxy-subdomain
   containers:
   - name: dummy-v6-proxy
     tty: true
     image: hectorcadavid/dummy-v6-server-proxy
     ports:
     - containerPort:  8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: v6proxy-subdomain
+  namespace: v6-jobs
+spec:
+  selector:
+    app: dummy-v6-proxy
+  ports:
+  - protocol: TCP
+    port:  8080
+    targetPort:  8080
