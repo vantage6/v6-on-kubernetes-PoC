@@ -15,7 +15,10 @@ spec:
     ports:
     - protocol: TCP
       port:  8080 # Assuming the dummy-v6-proxy pod listens on port  8080
-
+  - to:
+    ports:
+    - protocol: UDP
+      port: 53
 
 ---
 
@@ -32,3 +35,4 @@ spec:
   - Egress
   egress:
   - {} # This rule allows egress traffic to any destination (could be restricted to the V6-server only)
+
