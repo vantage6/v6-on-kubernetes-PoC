@@ -7,11 +7,24 @@ import requests
 import psutil
 
 
+#FQDN must match internal domain name defined on proxy_pod_deployment.yaml
+PROXY_FQDN = 'v6proxy.v6proxy-subdomain.v6-jobs'
+PROXY_PORT = '8080'
+
+
 def get_ip_addresses(family):
     for interface, snics in psutil.net_if_addrs().items():
         for snic in snics:
             if snic.family == family:
                 yield (interface, snic.address)
+
+
+def is_proxy_reachable():
+    try:
+        requests.get(f'http://{PROXY_FQDN}:{PROXY_PORT}', timeout=1)
+        return True
+    except requests.exceptions.RequestException:
+        return False
 
 
 def is_internet_reachable():
@@ -23,6 +36,8 @@ def is_internet_reachable():
 
 
 if __name__ == '__main__':
+
+    
 
     # Parse command line arguments
     parser = argparse.ArgumentParser()
@@ -61,6 +76,10 @@ if __name__ == '__main__':
         print(f"{interface}: {ipv6}")
 
     internet_reachable = is_internet_reachable()
-    print(f'Internet access test result:{"successful(no isolation)" if internet_reachable else "failed(isolated env.)"}')    
-    print('Waiting one minute before finishing the job (to simulate a more expensive task and to give you time to login on the POD)')
-    time.sleep(120)
+    print(f'Internet access :{"ENABLED" if internet_reachable else "DISABLED"}')    
+
+    proxy_rechable = is_proxy_reachable()
+    print(f'V6-proxy status :{f"REACHABLE at {PROXY_FQDN}" if proxy_rechable else f"DISABLED or unreachable at {PROXY_FQDN}"}')    
+
+    print('Waiting five minutes before finishing the job (to simulate a more expensive task and to give you time to login on the POD)')
+    time.sleep(300)
