@@ -10,6 +10,7 @@ spec:
   subdomain: k8snet
   containers:
   - name: dummy-v6-proxy
+    tty: true
     image: hectorcadavid/dummy-v6-server-proxy
     ports:
     - containerPort:  8080
