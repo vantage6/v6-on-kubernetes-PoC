@@ -1,4 +1,16 @@
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: v6-node
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: v6-jobs
+
+---
+apiVersion: v1
 kind: Pod
 metadata:
  name: poc-node-pod
