@@ -213,7 +213,7 @@ The other artifacts in this repository are below described:
 
 	![alt text](img/alg-io-and-nw-status.png)
 
-	As the 'algorithm' will be running for five minutes, you can also open a terminal through the dashboard on the corresponding POD, and perform further validations:
+	As the 'algorithm' will be running for five minutes, you can also open a terminal through the dashboard on the corresponding POD, and perform further experiments (e.g., run wget commands).
 
 
 17. Now you can check the directories structure and output files created by the Node and by the algorithms on the host. For example:
