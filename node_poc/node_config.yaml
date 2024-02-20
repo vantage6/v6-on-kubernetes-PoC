@@ -60,7 +60,7 @@
 # data source you can specify 'other'.
 databases:
   - label: default
-    uri: /home/hcadavid/k8s/v6-Kubernetes-PoC/csv/employees.csv
+    uri: /home/hcadavid/k8s/v6-on-kubernetes-PoC/csv/employees.csv
     type: csv
 
   #- label: omop

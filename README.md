@@ -52,9 +52,9 @@ The other artifacts in this repository are below described:
 - [x] Baseline code for experiments
 - [x] Programmatically launching algorithms as job PODs, binding volumes to them, according to v6 configuration settings: ('task_dir': output, tmp, token) and ('databases': input). * See diagram below.
 - [x] Kubernetes configuration for launching the node as a POD deployment, giving it access to the host's Kubernetes configuration (so it can perform further operations on Kubernetes programmatically).
-- [ ] Defining network isolation rules for the POD jobs as a NetworkPolicy resource. Create 'diagnostics' algorithms to check these rules.
+- [X] Defining network isolation rules for the POD jobs as a NetworkPolicy resource. Create 'diagnostics' algorithms to check these rules.
+- [X] Include the Proxy server, and add isolation rules accordingly.
 - [ ] Task-status related methods (getting results, listing, killing tasks, etc).
-- [ ] Include the Proxy server, and add isolation rules accordingly.
 - [ ] Communication between algorithms and the server through the Proxy.
 - [ ] Evaluation of GPU resources pass-through & combining image types (podman, singularity)
 - [ ] Node-to-node communication through a VPN
@@ -133,14 +133,13 @@ The other artifacts in this repository are below described:
 	     path: /home/myhome/<clone_path>/v6-Kubernetes-PoC/node_poc/node_config.yaml
 	```
 
-10. __(Optional)__ Please note that you will be launching a containerized copy of the Node already published on Dockerhub (docker.io/hectorcadavid/dummy-node-x86:latest), which contains the current version of the node's source code. Once you have made changes to the Node source code, you will need to publish the new version on your own local or online registry, and update the spec/containers/image value accordingly:
-
+10. __(Optional)__ Please note that you will be deploy -as a POD- a containerized copy of the Node already published on Dockerhub (docker.io/hectorcadavid/dummy_v6_node:latest). Once you have made changes to the Node source code, you will need to publish the new version on your own local or online registry, and update the spec/containers/image value accordingly on node_poc/kubeconfs/node_pod_config.yaml:
 
 	```
 	spec:
 	 containers:
 	 - name: dummy-node-server
-	   image: docker.io/hectorcadavid/dummy-node-x86:latest
+	   image: docker.io/hectorcadavid/dummy_v6_node:latest
 	```
 
 
@@ -152,7 +151,14 @@ The other artifacts in this repository are below described:
 12. Open the dashboard running on the 10443 port (https://localhost:10443/). 
 
 
-13. Run the Node as a POD deployment. Once you have done this, check in the dashboard the status of the POD and the log messages to make sure it is working correctly.
+13. __(Update)__ Execute the v6-node related kubernetes configuration located on node_poc/kubeconfs: one for [deploying the Node](node_poc/kubeconfs/node_pod_config.yaml) (previously mentioned) and another for [applying Network Policies](node_poc/kubeconfs/network_policies.yaml). To apply both configurations at one just give the 'kubeconfs' folder as argument to the kubectl command:
+
+	```
+	cd node_poc
+	kubectl apply -f ./kubeconfs
+	```
+
+	Once you have done this, check in the dashboard the status of the POD and the log messages to make sure it is working correctly.
 
 	```
 	cd node_poc
@@ -162,9 +168,22 @@ The other artifacts in this repository are below described:
 	![](img/dashboard1.png)
 	![](img/dashboard2.png)
 
-14. Now, you can publish requests to the server, to activate a task on the Node. You can edit the sample script on `dummy_socketio_server`/`command_emitter.py`. Update the IP address and port so it matches the ones on your 'dummy' server, and define a 'payload' with a different run_id each time. 
 
-	The given example launches an 'avg' algorithm published on Dockerhub (hectorcadavid/avg-alg-x86). This algorithm depends on provisional file system conventions of the PoC: (1) all csv-DBs given on the v6 configuration file will be bound as a file on the /app/input/csv within the container, and (2) the output folder of the given 'run' will be bound to the 'app/output' folder within the container. The latter, as described in the diagram, will correspond to the directory hierarchy on the host: `<task-dir-setting-path`>/`<run_id`>/`output`.
+14. __(New)__ In order to test the network policies, you also need to deploy a 'dummy-proxy'. This proxy is expected to be the only endpoint any algorithm has access to when a request to the v6-server is needed. 
+
+	```
+	cd dummy_proxy
+	kubectl apply -f proxy_pod_deployment.yaml
+	```
+
+	Check the proxy's POD boot logs, and make sure that they report the outbound traffic as enabled:
+
+	![alt text](img/proxy-dashboard-status.png)
+
+
+15. __(Updated)__ Now, you can publish requests to the server, to activate a task on the Node. You can edit the sample script on `dummy_socketio_server`/`command_emitter.py`. Update the IP address and port so it matches the ones on your 'dummy' server, and define a 'payload' with a different run_id each time. 
+
+	The given example launches an 'avg' algorithm published on Dockerhub (hectorcadavid/v6_average_algorithm). This algorithm depends on provisional file system conventions of the PoC: (1) all csv-DBs given on the v6 configuration file will be bound as a file on the /app/input/csv within the container, and (2) the output folder of the given 'run' will be bound to the 'app/output' folder within the container. The latter, as described in the diagram, will correspond to the directory hierarchy on the host: `<task-dir-setting-path`>/`<run_id`>/`output`.
 
  
 	```
@@ -175,7 +194,7 @@ The other artifacts in this repository are below described:
 	run_cmd_payload = {
 	    "run_id": 33333312,
 	    "task_info": {"arg1":"/app/input/csv/default","arg2":"Age","arg3":"/app/output/avg.txt"},
-	    "image": "hectorcadavid/avg-alg-x86",
+	    "image": "hectorcadavid/v6_average_algorithm",
 	    "docker_input": "input1",
 	    "tmp_vol_name": "example-tmp-vol",
 	    "token": "example_token",
@@ -188,12 +207,16 @@ The other artifacts in this repository are below described:
 	
 	``` 
 
-15. Once the request is published and the Node processes it, you can check the status with the Kubernetes dashboard. The 'avg' algorithm sleeps for 1 minute so you have time to check the log and even open a shell terminal through the dashboard.
+16. __(Updated)__ Once the request to execute the avg-algorithm has been posted and the Node processed it, you can check the status with the Kubernetes dashboard. As [this algorithm](avg_alg/app.py) now also checks (1) whether the Internet is reachable from where it is executed, and (2) whether the 'proxy' is reachable using kubernetes' internal DNS, make sure that the logs report that:
+	- Outbound access is disabled
+	- The proxy is reachable
 
- 	![](img/dashboard-alg-io.png)
+	![alt text](img/alg-io-and-nw-status.png)
+
+	As the 'algorithm' will be running for five minutes, you can also open a terminal through the dashboard on the corresponding POD, and perform further validations:
 
 
-16. Now you can check the directories structure and output files created by the Node and by the algorithms on the host. For example:
+17. Now you can check the directories structure and output files created by the Node and by the algorithms on the host. For example:
 
 	```
 	tree /<task-dir-setting-path>
