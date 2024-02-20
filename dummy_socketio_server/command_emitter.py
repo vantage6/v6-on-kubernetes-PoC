@@ -6,9 +6,9 @@ sio.connect('http://192.168.178.185:5000')
 
 
 run_cmd_payload = {
-    "run_id": 33333312,
+    "run_id": 100000035,
     "task_info": {"arg1":"/app/input/csv/default","arg2":"Age","arg3":"/app/output/avg.txt"},
-    "image": "clgeng/v6_average_algorithm",
+    "image": "hectorcadavid/v6_average_algorithm",
     "docker_input": "input1",
     "tmp_vol_name": "example-tmp-vol",
     "token": "example_token",

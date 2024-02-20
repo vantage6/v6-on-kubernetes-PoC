@@ -6,7 +6,7 @@ metadata:
   labels:
     app: dummy-v6-proxy
 spec:
-  hostname: v6proxy
+  hostname: v6proxy   #hostname and subdomain will be used by pods within the namespace to reach the proxy using the internal DNS
   subdomain: v6proxy-subdomain
   containers:
   - name: dummy-v6-proxy
