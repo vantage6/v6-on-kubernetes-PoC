@@ -1,10 +1,34 @@
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:
-  name: default-deny-all-egress
+  name: v6-jobs-allow-egress-to-proxy-only
   namespace: v6-jobs
 spec:
+  podSelector: {} # This selects all pods in the v6-jobs namespace
   policyTypes:
   - Egress
-  podSelector: {}
-  egress: []
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: dummy-v6-proxy # This targets the dummy-v6-proxy pod
+    ports:
+    - protocol: TCP
+      port:  8080 # Assuming the dummy-v6-proxy pod listens on port  8080
+
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: v6-proxy-allow-internet-egress
+  namespace: v6-jobs
+spec:
+  podSelector:
+    matchLabels:
+      app: dummy-v6-proxy
+  policyTypes:
+  - Egress
+  egress:
+  - {} # This rule allows egress traffic to any destination (could be restricted to the V6-server only)
