@@ -151,7 +151,7 @@ The other artifacts in this repository are below described:
 12. Open the dashboard running on the 10443 port (https://localhost:10443/). 
 
 
-13. __(Update)__ Execute the v6-node related kubernetes configuration located on node_poc/kubeconfs: one for [deploying the Node](node_poc/kubeconfs/node_pod_config.yaml) (previously mentioned) and another for [applying Network Policies](node_poc/kubeconfs/network_policies.yaml). To apply both configurations at one just give the 'kubeconfs' folder as argument to the kubectl command:
+13. __(Update)__ Execute the v6-node related kubernetes configuration located on node_poc/kubeconfs: one for [deploying the Node](node_poc/kubeconfs/node_pod_config.yaml) (previously mentioned) and another for [applying Network Policies](node_poc/kubeconfs/network_policies.yaml). To apply both configurations at once just give the 'kubeconfs' folder as argument to the kubectl command:
 
 	```
 	cd node_poc
