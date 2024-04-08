@@ -7,9 +7,34 @@ import re
 import os
 import yaml
 import logging
+import time
 
 
 log = logging.getLogger(logger_name(__name__))
+
+class Result(NamedTuple):
+    """
+    Data class to store the result of the docker image.
+
+    Attributes
+    ----------
+    run_id: int
+        ID of the current algorithm run
+    logs: str
+        Logs attached to current algorithm run
+    data: str
+        Output data of the algorithm
+    status_code: int
+        Status code of the algorithm run
+    """
+
+    run_id: int
+    task_id: int
+    logs: str
+    data: str
+    status: str
+    parent_id: int | None
+
 
 class ContainerManager:
 
@@ -148,20 +173,69 @@ class ContainerManager:
         Kubernetes will automatically retry the job N times (backoff_limit value above). According
         to the Pod's backoff failure policy, it will have a failed status only after the last failed retry.
         """
+        
+        interval = 1
+        timeout = 60
+
+        
+        #time.sleep(10)
+        start_time = time.time()
+        #poll for the POD to be created before checking its container execution status
+        while True:
+            pods = self.core_api.list_namespaced_pod(namespace="v6-jobs", label_selector=f"app={run_id}")
+            if pods.items:
+                #The container was created. Now wait until it reports either an 'active' or 'failed' status
+                # Pod-creation -> Pending -> Running -> Failed
+                #What should be done in the case of a timeout while checking this?
+
+                print(f"Found {len(pods.items)} pods with label app={run_id}")
+                status = self.__wait_until_pod_running(f"app={run_id}")
+                print("done waiting.")
+
+                return status, None
+                
+                break
+            elif time.time() - start_time > timeout:
+                
+                #The job could still start after the timeout
+                return TaskStatus.UNKNOWN_ERROR
+                break
+            else:            
+                time.sleep(interval)
+
+
+    def __wait_until_pod_running(self,label_selector:str)->TaskStatus:
+        """
+        Wait until a 'running' status is reported
+        
+        The result is either TaskStatus.ACTIVE (POD image was kicked off), 
+                          or TaskStatus.UNKNOWN_ERROR if there is a timeout (e.g. other errors)
+
+
+        Question: where are the failures detected?
+
+        Wait for the POD to start
+        Potential statuses of a Job POD: Pending, Running, Succeeded, Failed, Unknown
+        """
+
+        # Start watching for events on the pod
         w = watch.Watch()
-        for event in w.stream(self.batch_api.list_namespaced_job, namespace="v6-jobs"):
-            job_status = event['object'].status
-            if job_status.succeeded:
+        
+
+        for event in w.stream(func=self.core_api.list_namespaced_pod,
+                            namespace="v6-jobs",
+                            label_selector=label_selector,
+                            timeout_seconds=120):
+            
+            pod_phase = event['object'].status.phase
+
+            if pod_phase == "Running":
                 w.stop()
-                return TaskStatus.ACTIVE, None
-
-            elif job_status.failed:
-                w.stop()
-                return TaskStatus.FAILED, None
-
-        #This point should never be reached
-        raise Exception('Invalid ')
-
+                return TaskStatus.ACTIVE
+                            
+        #This point is reached after timeout 
+        return TaskStatus.UNKNOWN_ERROR    
+    
 
     def _create_volume_mounts(self,run_id:str)->Tuple[List[client.V1Volume],List[client.V1VolumeMount]]:
         """
@@ -350,6 +424,7 @@ class ContainerManager:
         """
         
         """
+        To be discussed:
         Potential statuses of a Job POD: Pending, Running, Succeeded, Failed, Unknown
         This method is used locally to check whether a given task was already executed. In which case does
         happen?
@@ -405,6 +480,24 @@ class ContainerManager:
         return True
 
 
+    def get_result(self) -> Result:
+        """
+        Returns the oldest (FIFO) finished docker container.
+
+        This is a blocking method until a finished container shows up. Once the
+        container is obtained and the results are read, the container is
+        removed from the docker environment.
+
+        Returns
+        -------
+        Result
+            result of the docker image
+        """
+
+
+
+
+
     #def cleanup_tasks(self) -> list[KilledRun]:
         """
         Stop all active tasks
@@ -428,21 +521,6 @@ class ContainerManager:
         # again when the node is restarted
 
    
-
-    #def get_result(self) -> Result:
-        """
-        Returns the oldest (FIFO) finished docker container.
-
-        This is a blocking method until a finished container shows up. Once the
-        container is obtained and the results are read, the container is
-        removed from the docker environment.
-
-        Returns
-        -------
-        Result
-            result of the docker image
-        """
-
 
 
 
