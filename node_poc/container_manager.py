@@ -1,14 +1,22 @@
-from kubernetes import client, config
-from task_status import TaskStatus
+from kubernetes import client, config, watch
+from vantage6.common.task_status import TaskStatus
 from typing import Tuple, List
+from vantage6.common.task_status import TaskStatus, has_task_failed
+from vantage6.common import logger_name
 import re
 import os
 import yaml
+import logging
+
+
+log = logging.getLogger(logger_name(__name__))
 
 class ContainerManager:
 
     #v6-node configuration entries
     v6_config: dict
+
+    log = logging.getLogger(logger_name(__name__))
 
     def __init__(self):
 
@@ -45,15 +53,14 @@ class ContainerManager:
 
 
     def version(self)->str:
-        return 0
+        return "0"
 
 
 
     def run(self, run_id: int, task_info: dict, image: str,
             docker_input: bytes, tmp_vol_name: str, token: str,
             databases_to_use: list[str]
-        )->None:
-            #) -> tuple[TaskStatus, list[dict] | None]:
+        )->tuple[TaskStatus, list[dict] | None]:
         """
         Checks if docker task is running. If not, creates DockerTaskManager to
         run the task
@@ -82,6 +89,17 @@ class ContainerManager:
             each port on the VPN client that forwards traffic to the algorithm
             container (``None`` if VPN is not set up).
         """
+        # Verify that an allowed image is used
+        if not self.is_docker_image_allowed(image, task_info):
+            msg = f"Docker image {image} is not allowed on this Node!"
+            self.log.critical(msg)
+            return TaskStatus.NOT_ALLOWED, None
+
+        # Check that this task is not already running
+        if self.is_running(run_id):
+            self.log.warn("Task is already being executed, discarding task")
+            self.log.debug(f"run_id={run_id} is discarded")
+            return TaskStatus.ACTIVE, None
 
         str_run_id = str(run_id)
 
@@ -121,14 +139,36 @@ class ContainerManager:
 
         self.batch_api.create_namespaced_job(namespace="v6-jobs", body=job)
 
+        #Based on
+        #https://stackoverflow.com/questions/57563359/how-to-properly-update-the-status-of-a-job
+        #https://kubernetes.io/docs/concepts/workloads/controllers/job/#pod-backoff-failure-policy
+
+        """
+        Pending, Running, Succeeded, Failed, Unknown
+        Kubernetes will automatically retry the job N times (backoff_limit value above). According
+        to the Pod's backoff failure policy, it will have a failed status only after the last failed retry.
+        """
+        w = watch.Watch()
+        for event in w.stream(self.batch_api.list_namespaced_job, namespace="v6-jobs"):
+            job_status = event['object'].status
+            if job_status.succeeded:
+                w.stop()
+                return TaskStatus.ACTIVE, None
+
+            elif job_status.failed:
+                w.stop()
+                return TaskStatus.FAILED, None
+
+        #This point should never be reached
+        raise Exception('Invalid ')
 
 
     def _create_volume_mounts(self,run_id:str)->Tuple[List[client.V1Volume],List[client.V1VolumeMount]]:
         """
         Define all the mounts required by the algorithm/job: input files (csv), output, and temporal data
         """
-        volumes :[client.V1Volume] = []
-        vol_mounts:[client.V1VolumeMount] = []
+        volumes :List[client.V1Volume] = []
+        vol_mounts:List[client.V1VolumeMount] = []
         
 
         # Define a volume for input/output for this run. Following v6 convention, this is a volume bind to a
@@ -269,7 +309,7 @@ class ContainerManager:
 
 
     
-    #def is_docker_image_allowed(self, docker_image_name: str, task_info: dict) -> bool:
+    def is_docker_image_allowed(self, docker_image_name: str, task_info: dict) -> bool:
         """
         Checks the docker image name.
 
@@ -288,11 +328,14 @@ class ContainerManager:
         bool
             Whether docker image is allowed or not
         """
+        #TODO actual implementation
+        return True
     
 
     
-    #def is_running(self, run_id: int) -> bool:
+    def is_running(self, run_id: int) -> bool:
         """
+        
         Check if a container is already running for <run_id>.
 
         Parameters
@@ -305,6 +348,61 @@ class ContainerManager:
         bool
             Whether or not algorithm container is running already
         """
+        
+        """
+        Potential statuses of a Job POD: Pending, Running, Succeeded, Failed, Unknown
+        This method is used locally to check whether a given task was already executed. In which case does
+        happen?
+        Given the above What would be the expected return value if the task was already completed or failed?
+        
+        """
+        pods = self.core_api.list_namespaced_pod(namespace="v6-jobs", label_selector=f"app={run_id}")
+        if pods.items:
+            return True
+        else:
+            return False
+
+
+    def __deleteme_status(self, run_id: int) -> bool:
+        """
+        
+        Check if a container is already running for <run_id>.
+
+        Parameters
+        ----------
+        run_id: int
+            run_id of the algorithm container to be found
+
+        Returns
+        -------
+        bool
+            Whether or not algorithm container is running already
+        """
+        print (f"Status of {run_id}")
+
+        try:
+            # Get the pod details
+            pods = self.core_api.list_namespaced_pod(namespace="v6-jobs", label_selector=f"app={run_id}")
+            if pods.items:
+                pod = pods.items[0]
+                # Access the 'app' label from the pod's metadata
+                app_label = pod.metadata.labels.get('app')
+                print(f"Pod {pod.metadata.name} has 'app' label: {app_label}")
+                print(f"Pod {str(run_id)} status: {pod.status.phase}")   
+                print(type(pod.status.phase)) 
+            else:
+                print("No pods found with the specified label.")            
+            
+            
+
+
+        except client.ApiException as e:
+            print(f"Exception when calling CoreV1Api->read_namespaced_pod: {e}")
+
+        #job_pods = self.core_api.list_namespaced_pod("v6-jobs")
+        #print(type(job_pods))
+        #print(job_pods)
+        return True
 
 
     #def cleanup_tasks(self) -> list[KilledRun]:
