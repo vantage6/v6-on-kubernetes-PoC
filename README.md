@@ -159,11 +159,6 @@ The other artifacts in this repository are below described:
 	```
 
 	Once you have done this, check in the dashboard the status of the POD and the log messages to make sure it is working correctly.
-
-	```
-	cd node_poc
-	kubectl apply -f node_pod_config.yaml
-	```
 	
 	![](img/dashboard1.png)
 	![](img/dashboard2.png)
