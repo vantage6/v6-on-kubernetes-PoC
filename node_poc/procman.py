@@ -16,15 +16,20 @@ def run_algorithm(json_input):
 
 res = run_algorithm(
     {
-    "run_id": 100000076,
-    "task_info": {"arg1":"/app/input/csv/default","arg2":"Age","arg3":"/app/output/avg.txt"},
-    "image": "hectorcadavid/dummy-v6-server-proxy",
+    "run_id": 200000006,
+    "task_info": {"arg1":"/app/input/csv/defaultxxx","arg2":"Age","arg3":"/app/output/avg.txt"},
+    "image": "hectorcadavid/v6_average_algorithm",
     "docker_input": "input1",
     "tmp_vol_name": "example-tmp-vol",
     "token": "example_token",
     "databases_to_use": ["default","db1", "db2", "db3"]
     }
 )
+
+while True:
+    print("Getting results")    
+    time.sleep(10)
+    container_manager.get_result()
 
 print(type(res))
 print(f'Execution result:{res}')

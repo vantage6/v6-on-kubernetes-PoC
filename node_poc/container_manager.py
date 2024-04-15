@@ -3,6 +3,8 @@ from vantage6.common.task_status import TaskStatus
 from typing import Tuple, List
 from vantage6.common.task_status import TaskStatus, has_task_failed
 from vantage6.common import logger_name
+from typing import NamedTuple
+from enum import Enum
 import re
 import os
 import yaml
@@ -43,10 +45,11 @@ class ContainerManager:
 
     log = logging.getLogger(logger_name(__name__))
 
+
     def __init__(self):
 
         global v6_config
-        
+            
         #minik8s config
         home_dir = os.path.expanduser('~')
         kube_config_file_path = os.path.join(home_dir, '.kube', 'config')
@@ -71,14 +74,44 @@ class ContainerManager:
             print(f'v6 settings:{v6_config}')
             print('Microk8s using configuration file bind to a POD')            
         
+        # before a task is executed it gets exposed to these policies
+        self._policies = self._setup_policies(config)
+
         # K8S Batch API instance
         self.batch_api = client.BatchV1Api()
         # K8S Core API instance
         self.core_api = client.CoreV1Api()
 
+        
+
 
     def version(self)->str:
         return "0"
+
+
+    def _setup_policies(self, config: dict) -> dict:
+        """
+        Set up policies for the node.
+
+        Parameters
+        ----------
+        config: dict
+            Configuration dictionary
+
+        Returns
+        -------
+        dict
+            Dictionary with the policies
+        """
+        policies = v6_config.get("policies", {})
+        if not policies or not policies.get("allowed_algorithms"):
+            self.log.warning(
+                "No policies on allowed algorithms have been set for this node!"
+            )
+            self.log.warning(
+                "This means that all algorithms are allowed to run on this node."
+            )
+        return policies
 
 
 
@@ -95,7 +128,7 @@ class ContainerManager:
         run_id: int
             Server run identifier
         task_info: dict
-            Dictionary with task information
+            Dictionary with task information *** Includes parent-algorithm id
         image: str
             Docker image name
         docker_input: bytes
@@ -114,6 +147,10 @@ class ContainerManager:
             each port on the VPN client that forwards traffic to the algorithm
             container (``None`` if VPN is not set up).
         """
+
+        #Usage context: https://github.com/vantage6/vantage6/blob/b0c961c8a060d9ea656e078e685a8e7d0560ef44/vantage6-node/vantage6/node/__init__.py#L349
+
+
         # Verify that an allowed image is used
         if not self.is_docker_image_allowed(image, task_info):
             msg = f"Docker image {image} is not allowed on this Node!"
@@ -158,7 +195,7 @@ class ContainerManager:
                         restart_policy="Never",
                     ),
                 ),
-                backoff_limit=4,
+                backoff_limit=1,
             ),
         )
 
@@ -177,10 +214,10 @@ class ContainerManager:
         interval = 1
         timeout = 60
 
-        
-        #time.sleep(10)
         start_time = time.time()
-        #poll for the POD to be created before checking its container execution status
+        
+        #the create_namespaced_job() method is asynchronous, so evaluating the pod execution status
+        #requires first polling the K8S API until the new job/POD shows up.
         while True:
             pods = self.core_api.list_namespaced_pod(namespace="v6-jobs", label_selector=f"app={run_id}")
             if pods.items:
@@ -204,18 +241,25 @@ class ContainerManager:
                 time.sleep(interval)
 
 
-    def __wait_until_pod_running(self,label_selector:str)->TaskStatus:
+    def __wait_until_pod_running(self,run_id_label_selector:str)->TaskStatus:
         """
-        Wait until a 'running' status is reported
+        This method execution gets blocked until the POD with the given label selector (which corresponds
+        to the task's 'run_id') reports a 'Running' state. This method is expected to be used right
+        after the job's creation request. Once this request is done, the POD has to initial statuses:
+        'Pending' and the 'Running'. 
+
+        Returns:
+        Either TaskStatus.ACTIVE when the POD status is 'Running' (the POD container was kicked off), 
+                          or TaskStatus.UNKNOWN_ERROR if there is a timeout while waiting for
+                           reaching such 'Running' status (due to other errors)
         
-        The result is either TaskStatus.ACTIVE (POD image was kicked off), 
-                          or TaskStatus.UNKNOWN_ERROR if there is a timeout (e.g. other errors)
 
-
-        Question: where are the failures detected?
+        *Question: where are the failures detected on v6? : error code of command
 
         Wait for the POD to start
-        Potential statuses of a Job POD: Pending, Running, Succeeded, Failed, Unknown
+                                                              / Succeded
+        Potential statuses of a Job POD: Pending -> Running - - Failed
+                                                              \ Unknown
         """
 
         # Start watching for events on the pod
@@ -224,7 +268,7 @@ class ContainerManager:
 
         for event in w.stream(func=self.core_api.list_namespaced_pod,
                             namespace="v6-jobs",
-                            label_selector=label_selector,
+                            label_selector=run_id_label_selector,
                             timeout_seconds=120):
             
             pod_phase = event['object'].status.phase
@@ -402,8 +446,11 @@ class ContainerManager:
         bool
             Whether docker image is allowed or not
         """
-        #TODO actual implementation
+        
+        #TODO use original v6 implementation
+        
         return True
+        
     
 
     
@@ -480,20 +527,157 @@ class ContainerManager:
         return True
 
 
-    def get_result(self) -> Result:
-        """
-        Returns the oldest (FIFO) finished docker container.
+    def get_result(self) -> None:
+    #def get_result(self) -> Result:
 
-        This is a blocking method until a finished container shows up. Once the
-        container is obtained and the results are read, the container is
-        removed from the docker environment.
+        """
+        * Original description:
+            Returns the oldest (FIFO) finished docker container.
+
+
+            This is a blocking method until a finished container shows up. Once the
+            container is obtained and the results are read, the container is
+            removed from the docker environment.
+
+        * Proposed (more accurate) description:
+            name: process_next_completed_job
+            Process the next completed pod/jobs (can be either finsihed or failed), as soon any of these is shown (not necesarily FIFO):
+
+                When failed-POD found (after N attempts (N = job backoffLimit) ) => 
+                    Cleanup POD/containers
+                    return Result with:
+                        TaskStatus.CRASHED
+                        Log error: logs = self.container.logs().decode("utf8")
+
+                When Successful POD found=>
+                    return Result with:
+                        TaskStatus.COMPLETED
+                        Result file content
+                        Log: report status: logs = self.container.logs().decode("utf8")
+
+
+                                                              / Succeded
+        Potential statuses of a Job POD: Pending -> Running - - Failed
+                                                              \ Unknown
+
+
+
+        Original V6-method side effects:
+
+
+
 
         Returns
         -------
         Result
             result of the docker image
         """
+        # Blocking method (who calls this method?)- waits until there is a finished or a failed task (*when a task is marked as failed?)
 
+        # if there are finished tasks, get results from the corresponding file, capture logs, destroy container (POD),send a request to remove VPN
+
+
+        
+
+        # If there are no PODs, wait until there is at least one available
+        job_pods = []
+
+
+        while not job_pods:
+            job_pods = self.core_api.list_namespaced_pod(namespace="v6-jobs")    
+            time.sleep(1)
+
+        for pod in job_pods.items:
+            job_id = pod.metadata.labels.get('app')
+            pod_tty_output = self.core_api.read_namespaced_pod_log(pod.metadata.name, "v6-jobs")
+            
+            if pod.status.phase == "Succeeded":                
+                self.log.info(f"Getting output from job POD {pod.metadata.name} /v6-job {job_id}")
+
+
+                #If executing from POD, use convetion '/app/tasks
+                #if executing from HOST, use path given in config file
+                output_file = os.path.join('/app/tasks', job_id, 'output/avg.txt')
+
+                #read file
+
+                self.log.info(f"Cleaning up container & job POD {pod.metadata.name} from v6-job {job_id}")
+                self.core_api.delete_namespaced_pod(pod.metadata.name, "v6-jobs")
+
+
+
+                """
+                Convention from node k8s config file:
+
+                - name: task-files-root
+                    mountPath: /app/tasks
+               
+                ├── tasks
+                    │   ├── job_id
+                    │   │   ├── output
+                    │   │   │   └── avg.txt
+                    │   │   └── tmp
+                """
+
+
+                return Result(
+                        #run_id=finished_task.run_id,
+                        task_id=job_id,
+                        logs=pod_tty_output,  
+                        data="",   
+                        status=TaskStatus.COMPLETED
+                        #parent_id=finished_task.parent_id, #get_parent_id(task_dict: dict) will be used
+                    )                    
+
+
+            elif pod.status.phase == "Failed":
+                #Should the POD be cleaned up in this case too?
+
+                return Result(
+                        #run_id=finished_task.run_id,
+                        task_id=job_id,
+                        logs=pod_tty_output,  
+                        data=b"",   
+                        status=TaskStatus.CRASHED
+                        #parent_id=finished_task.parent_id, #get_parent_id(task_dict: dict) will be used
+                    )                    
+                    
+            elif pod.status.phase == "Unknown":
+                self.log.critical(f"Unkown status reported for the POD {pod.metadata.name} from v6-job {job_id}")
+                return Result(
+                        #run_id=finished_task.run_id,
+                        task_id=job_id,
+                        logs=pod_tty_output,  
+                        data=b"",   
+                        status=TaskStatus.UNKNOWN_ERROR
+                        #parent_id=finished_task.parent_id, #get_parent_id(task_dict: dict) will be used
+                    )                    
+
+                
+                    
+
+
+        #if pods.items:
+            #The container was created. Now wait until it reports either an 'active' or 'failed' status
+            # Pod-creation -> Pending -> Running -> Failed
+            #What should be done in the case of a timeout while checking this?
+
+        #    print(f"Found {len(pods.items)} pods with label app={run_id}")
+        #    status = self.__wait_until_pod_running(f"app={run_id}")
+        #    print("done waiting.")
+
+        #    return status, None
+
+        """
+        return Result(
+            run_id=finished_task.run_id, #???
+            task_id=finished_task.task_id, #???
+            logs=logs,  #Output
+            data=results,   #Content generated by the node
+            status=finished_task.status, #status
+            parent_id=finished_task.parent_id, #?????
+        )
+        """
 
 
 
