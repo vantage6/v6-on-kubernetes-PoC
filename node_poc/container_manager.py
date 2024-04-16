@@ -44,37 +44,43 @@ class Result(NamedTuple):
 class ContainerManager:
 
     #v6-node configuration entries
-    v6_config: dict
-
+    #v6_config: dict
+    
     log = logging.getLogger(logger_name(__name__))
 
 
     def __init__(self):
 
-        global v6_config
-            
+        self.v6_config: dict
+        
+        self.running_on_guest_env: bool
+
         #minik8s config
         home_dir = os.path.expanduser('~')
         kube_config_file_path = os.path.join(home_dir, '.kube', 'config')
 
         #Instanced within the host
         if os.path.exists(kube_config_file_path):
-            #default microk8s
+
+            self.running_on_guest_env = False
+            #default microk8s config
             config.load_kube_config(kube_config_file_path)
 
             with open('node_config.yaml', 'r') as file:
-                v6_config = yaml.safe_load(file)
+                self.v6_config = yaml.safe_load(file)
 
-            log.info(f'v6 settings:{v6_config}')
+            log.info(f'v6 settings:{self.v6_config}')
             log.info('Using microk8s host configuration')            
         
         #Instanced within a pod
         elif os.path.exists('/app/.kube/config'):
+
+            self.running_on_guest_env = True
             #Default mount location defined on POD configuration                
             config.load_kube_config('/app/.kube/config')            
             with open('/app/.v6node/node_config.yaml', 'r') as file:
-                v6_config = yaml.safe_load(file)
-            print(f'v6 settings:{v6_config}')
+                self.v6_config = yaml.safe_load(file)
+            print(f'v6 settings:{self.v6_config}')
             print('Microk8s using configuration file bind to a POD')            
         
         # before a task is executed it gets exposed to these policies
@@ -106,7 +112,7 @@ class ContainerManager:
         dict
             Dictionary with the policies
         """
-        policies = v6_config.get("policies", {})
+        policies = self.v6_config.get("policies", {})
         if not policies or not policies.get("allowed_algorithms"):
             self.log.warning(
                 "No policies on allowed algorithms have been set for this node!"
@@ -295,7 +301,7 @@ class ContainerManager:
         # algorithm instances of the same 'run' within this node).
         io_volume = client.V1Volume(
             name=f'task-{run_id}-output',
-            host_path=client.V1HostPathVolumeSource(path=os.path.join(v6_config['task_dir'],run_id,'output'))
+            host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'output'))
         )
         volumes.append(io_volume)
 
@@ -324,7 +330,7 @@ class ContainerManager:
         # Define the volume for temporal data 
         tmp_volume = client.V1Volume(
             name=f'task-{run_id}-tmp',
-            host_path=client.V1HostPathVolumeSource(path=os.path.join(v6_config['task_dir'],run_id,'tmp')),
+            host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'tmp')),
         )
 
         volumes.append(tmp_volume)
@@ -339,7 +345,7 @@ class ContainerManager:
         vol_mounts.append(tmp_volume_mount)
 
         # Bind-mount all the CSV files (read only) defined on the configuration file 
-        csv_input_files = list(filter(lambda o: (o['type']=='csv'), v6_config['databases']))
+        csv_input_files = list(filter(lambda o: (o['type']=='csv'), self.v6_config['databases']))
 
         for csv_input in csv_input_files:
 
@@ -486,48 +492,6 @@ class ContainerManager:
             return False
 
 
-    def __deleteme_status(self, run_id: int) -> bool:
-        """
-        
-        Check if a container is already running for <run_id>.
-
-        Parameters
-        ----------
-        run_id: int
-            run_id of the algorithm container to be found
-
-        Returns
-        -------
-        bool
-            Whether or not algorithm container is running already
-        """
-        print (f"Status of {run_id}")
-
-        try:
-            # Get the pod details
-            pods = self.core_api.list_namespaced_pod(namespace="v6-jobs", label_selector=f"app={run_id}")
-            if pods.items:
-                pod = pods.items[0]
-                # Access the 'app' label from the pod's metadata
-                app_label = pod.metadata.labels.get('app')
-                print(f"Pod {pod.metadata.name} has 'app' label: {app_label}")
-                print(f"Pod {str(run_id)} status: {pod.status.phase}")   
-                print(type(pod.status.phase)) 
-            else:
-                print("No pods found with the specified label.")            
-            
-            
-
-
-        except client.ApiException as e:
-            print(f"Exception when calling CoreV1Api->read_namespaced_pod: {e}")
-
-        #job_pods = self.core_api.list_namespaced_pod("v6-jobs")
-        #print(type(job_pods))
-        #print(job_pods)
-        return True
-
-
     def get_result(self) -> Result:    
         """
         * Original description:
@@ -538,19 +502,20 @@ class ContainerManager:
 
         * Proposed (more accurate) description:
             proposed name: process_next_completed_job
-            Process the next completed pod/jobs (can be either finsihed or failed), as soon any of these is shown (not necesarily FIFO):
+            Process the next completed job (which can be either finsihed or failed), as soon any of these is shown (not necesarily FIFO):
 
                 When failed-job found (after N attempts handled by kubernetes (N = job backoffLimit) ) => 
                     Cleanup POD/containers
                     return Result with:
                         TaskStatus.CRASHED
-                        Log error: logs = self.container.logs().decode("utf8")
+                        Result: empty
+                        Log error: Logs from the N pods (backoff limit)
 
-                When Successful POD found=>
+                When Successful POD found =>
                     return Result with:
                         TaskStatus.COMPLETED
-                        Result file content
-                        Log: report status: logs = self.container.logs().decode("utf8")
+                        Result: file content
+                        Log: Logs from the N pods (backoff limit)
 
 
                                                               / Succeded
@@ -579,7 +544,7 @@ class ContainerManager:
 
                         #If executing from POD, use convention '/app/tasks
                         #output_file = os.path.join('/app/tasks', job_id, 'output/avg.txt')x
-                        succeded_job_output_file = os.path.join(v6_config['task_dir'],job_id,'output/avg.txt')
+                        succeded_job_output_file = os.path.join(self.v6_config['task_dir'],job_id,'output/avg.txt')
 
                         self.log.info(f"Reading data generated by job {job.metadata.name} at {succeded_job_output_file}")          
 
