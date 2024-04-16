@@ -14,9 +14,24 @@ def run_algorithm(json_input):
                task_info=json_input["task_info"],
                docker_input=None,databases_to_use=None,token=None)
 
+
+
 res = run_algorithm(
     {
-    "run_id": 200000006,
+    "run_id": 200000013,
+    "task_info": {"arg1":"/app/input/csv/default","arg2":"Age","arg3":"/app/output/avg.txt"},
+    "image": "hectorcadavid/v6_average_algorithm",
+    "docker_input": "input1",
+    "tmp_vol_name": "example-tmp-vol",
+    "token": "example_token",
+    "databases_to_use": ["default","db1", "db2", "db3"]
+    }
+)
+
+
+res = run_algorithm(
+    {
+    "run_id": 200000014,
     "task_info": {"arg1":"/app/input/csv/defaultxxx","arg2":"Age","arg3":"/app/output/avg.txt"},
     "image": "hectorcadavid/v6_average_algorithm",
     "docker_input": "input1",
@@ -26,10 +41,14 @@ res = run_algorithm(
     }
 )
 
-while True:
-    print("Getting results")    
+
+
+print("Polling changes")    
+while True:    
     time.sleep(10)
-    container_manager.get_result()
+    r = container_manager.get_result()
+    if r!=None:
+        print(r)
 
 print(type(res))
 print(f'Execution result:{res}')
