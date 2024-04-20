@@ -253,8 +253,8 @@ class ContainerManager:
         """
         This method execution gets blocked until the POD with the given label selector (which corresponds
         to the task's 'run_id') reports a 'Running' state. This method is expected to be used right
-        after the job's creation request. Once this request is done, the POD has to initial statuses:
-        'Pending' and the 'Running'. 
+        after the job's creation request. Once this request is done, the POD has two initial statuses:
+        'Pending' and then 'Running'. 
 
         Returns:
         Either TaskStatus.ACTIVE when the POD status is 'Running' (the POD container was kicked off), 
