@@ -54,7 +54,7 @@ The other artifacts in this repository are below described:
 - [x] Kubernetes configuration for launching the node as a POD deployment, giving it access to the host's Kubernetes configuration (so it can perform further operations on Kubernetes programmatically).
 - [X] Defining network isolation rules for the POD jobs as a NetworkPolicy resource. Create 'diagnostics' algorithms to check these rules.
 - [X] Include the Proxy server, and add isolation rules accordingly.
-- [ ] Task-status related methods (getting results, listing, killing tasks, etc).
+- [X] Algorithm/job execution control: the node polls the status of the running algorithms, capture the status of the completed ones (successful or failed), and destroy the jobs and pods when no longer needed.
 - [ ] Communication between algorithms and the server through the Proxy.
 - [ ] Evaluation of GPU resources pass-through & combining image types (podman, singularity)
 - [ ] Node-to-node communication through a VPN
@@ -202,7 +202,7 @@ The other artifacts in this repository are below described:
 	
 	``` 
 
-16. __(Updated)__ Once the request to execute the avg-algorithm has been posted and the Node processed it, you can check the status with the Kubernetes dashboard. As [this algorithm](avg_alg/app.py) now also checks (1) whether the Internet is reachable from where it is executed, and (2) whether the 'proxy' is reachable using kubernetes' internal DNS, make sure that the logs report that:
+16. __(Updated)__ Once the request to execute the avg-algorithm has been posted and the Node processed it, you can check the correspondong job status with the Kubernetes dashboard (select the 'v6-jobs' namespace to find it). As [this algorithm](avg_alg/app.py) now also checks (1) whether the Internet is reachable from where it is executed, and (2) whether the 'proxy' is reachable using kubernetes' internal DNS, make sure that the logs report that:
 	- Outbound access is disabled
 	- The proxy is reachable
 
@@ -211,8 +211,14 @@ The other artifacts in this repository are below described:
 	As the 'algorithm' will be running for five minutes, you can also open a terminal through the dashboard on the corresponding POD, and perform further experiments (e.g., run wget commands).
 
 
-17. Now you can check the directories structure and output files created by the Node and by the algorithms on the host. For example:
+17. __(Updated)__ The poc-node (like the original v6's node) constantly polls for running algorithms (i.e., the k8s jobs within the v6-jobs namespace) that have been completed (either due a successfull execution, or a failed one). When one is found, it gets the output data/results created by it on the filesystem (if the execution was successful), and create a description of the results including this and the execution status. The POC uses the original v6's [Result class](https://github.com/vantage6/vantage6/blob/b4f9676f99d5383a44780689a7dd60c67a73bb85/vantage6-node/vantage6/node/docker/docker_manager.py#L46), and [TaskStatus enumeration](https://github.com/vantage6/vantage6/blob/b4f9676f99d5383a44780689a7dd60c67a73bb85/vantage6-common/vantage6/common/task_status.py#L4)) for this. Upon completion, the poc-node also destroy the job and all the related PODs that were created while trying to complete it (a k8s job will create and lauch a new POD everytime the target task fails, depending on the backoffLimit parameter given during the job dispatch). In this PoC implementation of the node, these execution results are simply shown on the Node's STDOUT, hence you can check these through the Kubernetes dashboard (see the logs of the dummy-proxy-pod POD on the v6-node' namespace).
+
+![alt text](img/node_log_task_results.png)
+
+18. At this point, you can also check how the directory structures and output files are created by the Node and by the algorithms on the host. For example, if the 'task_dir' setting on the v6 configuration file is set to '/tmp/tasks', you can see it with:
 
 	```
-	tree /<task-dir-setting-path>
+	tree /tmp/tasks
 	```
+
+
