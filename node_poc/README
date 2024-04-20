@@ -5,3 +5,7 @@ docker push hectorcadavid/dummy-node-x86
 
 
 kubectl apply -f dummy_node.yaml
+
+
+#Cleaning all jobs
+kubectl delete all --all --namespace v6-jobs

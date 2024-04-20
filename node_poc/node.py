@@ -3,8 +3,22 @@ import time
 import socketio
 import os
 import json
+import threading
 
 container_manager = ContainerManager()
+
+
+def poll_execution_results():
+    print("Starting node's results polling thread")
+    while True:    
+        time.sleep(1)
+        next_result = container_manager.get_result()
+        print(f"""
+            *********************************************************************************  
+            EVENT @ NODE - job result reported
+            {next_result}
+            *********************************************************************************  
+            """)
 
 
 def run_algorithm(json_input):
@@ -47,6 +61,9 @@ def command(data):
 
 
 if __name__ == '__main__':
+    results_polling_thread = threading.Thread(target=poll_execution_results)
+    results_polling_thread.start()
+
     sio.connect(f'http://{host_ip}:{port}')
     sio.wait()
 
