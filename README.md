@@ -215,6 +215,14 @@ The other artifacts in this repository are below described:
 
 ![alt text](img/node_log_task_results.png)
 
+To see how an error generated during the execution of the 'algorithm' is reported with the CRASHED status, update the 'task_info' property of the payload from Step 15 as follows (so it gives a path that doesnt exist as an argument), run again the 'command_emmiter', and wait for the result:
+
+```
+{"arg1":"/app/input/csv/default_nonexisting_path","arg2":"Age","arg3":"/app/output/avg.txt"}
+```
+
+
+
 18. At this point, you can also check how the directory structures and output files are created by the Node and by the algorithms on the host. For example, if the 'task_dir' setting on the v6 configuration file is set to '/tmp/tasks', you can see it with:
 
 	```
