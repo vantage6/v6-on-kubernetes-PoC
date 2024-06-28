@@ -6,6 +6,8 @@ from gevent.pywsgi import WSGIServer
 from vantage6.common.exceptions import AuthenticationException
 from vantage6.common import logger_name
 import logging
+from logging import handlers
+import traceback
 import random
 import requests
 import time
@@ -29,7 +31,7 @@ class NodePod:
     def initialize(self) -> None:
 
         self.client = NodeClient(
-                    host="https://v6-server.tail984a0.ts.net/",
+                    host="https://v6-server.tail984a0.ts.net",
                     port="443",
                     path="/api",
                 )
@@ -63,7 +65,7 @@ class NodePod:
         TIME_LIMIT_RETRY_CONNECT_NODE = 60
         SLEEP_BTWN_NODE_LOGIN_TRIES = 2
 
-        api_key = "API"
+        api_key = ""
 
         success = False
         i = 0
@@ -105,6 +107,7 @@ class NodePod:
 
 
     def __proxy_server_worker(self) -> None:
+        
         """
         Proxy algorithm container communcation.
 
@@ -120,7 +123,6 @@ class NodePod:
             # accessible from within the docker algorithm container on
             # host.docker.internal.
             #default_proxy_host = "host.docker.internal"
-
         default_proxy_host = "localhost"
 
         # If PROXY_SERVER_HOST was set in the environment, it overrides our
@@ -132,51 +134,53 @@ class NodePod:
         #proxy_port = int(os.environ.get("PROXY_SERVER_PORT", 8080))
         proxy_port = 7450
 
-        # 'app' is defined in vantage6.node.proxy_server
-        debug_mode = self.debug.get("proxy_server", False)
-        if debug_mode:
-            self.log.debug("Debug mode enabled for proxy server")
-            proxy_server.app.debug = True
-        proxy_server.app.config["SERVER_IO"] = self.client
-        proxy_server.server_url = self.client.base_path
+        """
+        try:
 
-        # set up proxy server logging
-        log_level = getattr(logging, self.config["logging"]["level"].upper())
-        self.proxy_log = get_file_logger(
-            "proxy_server", self.ctx.proxy_log_file, log_level_file=log_level
-        )
+            # 'app' is defined in vantage6.node.proxy_server
+            
+            debug_mode = self.debug.get("proxy_server", False)
+            if debug_mode:
+                self.log.debug("Debug mode enabled for proxy server")
+                proxy_server.app.debug = True
+            proxy_server.app.config["SERVER_IO"] = self.client
+            proxy_server.server_url = self.client.base_path
 
-        # this is where we try to find a port for the proxyserver
-        for try_number in range(5):
-            self.log.info("Starting proxyserver at '%s:%s'", proxy_host, proxy_port)
-            http_server = WSGIServer(
-                ("0.0.0.0", proxy_port), proxy_server.app, log=self.proxy_log
-            )
+        except Exception as e:
+            print(e)
+        """
+        try:
 
-            try:
-                http_server.serve_forever()
+            # set up proxy server logging
+            #log_level = getattr(logging, self.config["logging"]["level"].upper())
+            #self.proxy_log = get_file_logger(
+            #    #"proxy_server", self.ctx.proxy_log_file, log_level_file=log_level
+            #    "proxy_server", './test_log_file.txt', log_level_file=logging.DEBUG, log_level_console = logging.DEBUG,
+            #)
+        
+            # this is where we try to find a port for the proxyserver
+            for try_number in range(5):
+                self.log.info("Starting proxyserver at '%s:%s'", proxy_host, proxy_port)
+                http_server = WSGIServer(
+                    ("0.0.0.0", proxy_port), proxy_server.app #, log=self.proxy_log
+                )                        
+                try:
+                    print('Before serving')
+                    http_server.serve_forever()
+                    print('Serving...')
+                except Exception as e:
+                    print('Exception')
 
-            except OSError as e:
-                self.log.info("Error during attempt %s", try_number)
-                self.log.info("%s: %s", type(e), e)
-
-                if e.errno == 48:
-                    proxy_port = random.randint(2048, 16384)
-                    self.log.warning("Retrying with a different port: %s", proxy_port)
-                    os.environ["PROXY_SERVER_PORT"] = str(proxy_port)
-
-                else:
-                    raise
-
-            except Exception as e:
-                self.log.error("Proxyserver could not be started or crashed!")
-                self.log.error(e)
-
+        except Exception as e:
+            print("Exception catched")
+            print(e)
+            
 
 
 if __name__ == '__main__':
 
     node = NodePod()
+    print("Success")
     
 
 
