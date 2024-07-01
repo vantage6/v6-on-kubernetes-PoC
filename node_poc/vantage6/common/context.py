@@ -13,10 +13,16 @@ import appdirs
 from vantage6.common import Singleton, error, Fore, Style, get_config_path, logger_name
 from vantage6.common.colors import ColorStreamHandler
 from vantage6.common.globals import APPNAME, InstanceType
-from vantage6.common.docker.addons import running_in_docker
-from vantage6.common.configuration_manager import ConfigurationManager
-from vantage6.common._version import __version__
 
+"""REMOVED_FROM_POC 
+from vantage6.common.docker.addons import running_in_docker
+"""
+
+from vantage6.common.configuration_manager import ConfigurationManager
+
+"""REMOVED_FROM_POC
+from vantage6.common._version import __version__
+"""
 
 class AppContext(metaclass=Singleton):
     """
@@ -134,7 +140,11 @@ class AppContext(metaclass=Singleton):
             f"Successfully loaded configuration from " f"'{self.config_file}'"
         )
         self.log.info("Logging to '%s'" % self.log_file)
+        self.log.info(f"Common package version NO-VERSION-K8S-PoC")
+        """REMOVED_FROM_POC
         self.log.info(f"Common package version '{__version__}'")
+        """
+        
 
     @classmethod
     def from_external_config_file(
@@ -252,13 +262,16 @@ class AppContext(metaclass=Singleton):
         if isinstance(instance_type, enum.Enum):
             instance_type = instance_type.value
 
+        """
+        #REMOVED_FROM_POC 
         if running_in_docker():
             return {
                 "log": Path("/mnt/log"),
                 "data": Path("/mnt/data"),
                 "config": Path("/mnt/config"),
             }
-        elif system_folders:
+        """
+        if system_folders:
             return {
                 "log": Path(d.site_data_dir) / instance_type / instance_name,
                 "data": Path(d.site_data_dir) / instance_type / instance_name,

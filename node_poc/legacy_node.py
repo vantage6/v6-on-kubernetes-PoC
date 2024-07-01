@@ -6,6 +6,7 @@ from gevent.pywsgi import WSGIServer
 from vantage6.common.exceptions import AuthenticationException
 from vantage6.common import logger_name
 from vantage6.node.socket import NodeTaskNamespace
+from vantage6.cli.context.node import NodeContext
 
 from vantage6.node.globals import (
     NODE_PROXY_SERVER_HOSTNAME,
@@ -24,6 +25,7 @@ import time
 import os
 import queue
 
+# Based on https://github.com/vantage6/vantage6/blob/be2e82b33e68db74304ea01c778094e6b40e671a/vantage6-node/vantage6/node/__init__.py#L1
 
 class NodePod:
 
@@ -39,7 +41,7 @@ class NodePod:
             raise    
 
     
-    def initialize(self) -> None:
+    def initialize(self, ctx: NodeContext) -> None:
 
         self.client = NodeClient(
                     host="https://v6-server.tail984a0.ts.net",
@@ -106,7 +108,7 @@ class NodePod:
         TIME_LIMIT_RETRY_CONNECT_NODE = 60
         SLEEP_BTWN_NODE_LOGIN_TRIES = 2
 
-        api_key = ""
+        api_key = "1b44626c-c7db-4712-bc29-467a73b79445"
 
         success = False
         i = 0
