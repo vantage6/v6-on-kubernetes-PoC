@@ -29,20 +29,25 @@ import queue
 
 class NodePod:
 
-    def __init__(self):
+    def __init__(self, ctx: NodeContext):
         self.log = logging.getLogger(logger_name(__name__))
+        self.ctx = ctx
 
         # Initialize the node. If it crashes, shut down the parts that started
         # already
         try:
-            self.initialize()
+            self.initialize(ctx)
         except Exception:
             self.cleanup()
             raise    
 
     
-    def initialize(self, ctx: NodeContext) -> None:
+    def initialize(self) -> None:
 
+        self.config = self.ctx.config
+        self.debug: dict = self.config.get("debug", {})
+        self._using_encryption = None
+        
         self.client = NodeClient(
                     host="https://v6-server.tail984a0.ts.net",
                     port="443",
@@ -78,7 +83,6 @@ class NodePod:
     def setup_encryption(self) -> None:
         #TODO check collaboration encryption configuration    
         """Setup encryption if the node is part of encrypted collaboration"""
-        """
         encrypted_collaboration = self.client.is_encrypted_collaboration()
         encrypted_node = self.config["encryption"]["enabled"]
 
@@ -94,8 +98,6 @@ class NodePod:
         else:
             self.log.warn("Disabling encryption!")
             self.client.setup_encryption(None)
-        """
-        self.client.setup_encryption(None)
 
 
     def authenticate(self):
@@ -411,7 +413,9 @@ class NodePod:
 
 if __name__ == '__main__':
 
-    node = NodePod()
+
+    ctx=NodeContext(instance_name='poc_instance', system_folders=False, config_file='configs/node_legacy_config.yaml')
+    node = NodePod(ctx)
     print("Success")
     
 

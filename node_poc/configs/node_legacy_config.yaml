@@ -83,12 +83,12 @@ databases:
 
 
 # end-to-end encryption settings
-#encryption:
+encryption:
 
   # whenever encryption is enabled or not. This should be the same
   # as the `encrypted` setting of the collaboration to which this
   # node belongs.
-#  enabled: false
+  enabled: false
 
   # location to the private key file
 #  private_key: /path/to/private_key.pem
