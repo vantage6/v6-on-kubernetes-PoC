@@ -1,5 +1,5 @@
 import logging
-
+import json 
 from socketio import ClientNamespace
 
 from vantage6.common import logger_name
@@ -64,7 +64,7 @@ class NodeTaskNamespace(ClientNamespace):
                 ID of the parent task (if any)
         """
         if self.node_worker_ref:
-            task_id = data.get("id")
+            task_id = data.get("id")            
             self.node_worker_ref.get_task_and_add_to_queue(task_id)
             self.log.info(f"New task has been added task_id={task_id}")
         else:

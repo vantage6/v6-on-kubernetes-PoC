@@ -24,6 +24,7 @@ import requests
 import time
 import os
 import queue
+import json
 
 # Based on https://github.com/vantage6/vantage6/blob/be2e82b33e68db74304ea01c778094e6b40e671a/vantage6-node/vantage6/node/__init__.py#L1
 
@@ -36,7 +37,7 @@ class NodePod:
         # Initialize the node. If it crashes, shut down the parts that started
         # already
         try:
-            self.initialize(ctx)
+            self.initialize()
         except Exception:
             self.cleanup()
             raise    
@@ -110,7 +111,7 @@ class NodePod:
         TIME_LIMIT_RETRY_CONNECT_NODE = 60
         SLEEP_BTWN_NODE_LOGIN_TRIES = 2
 
-        api_key = "1b44626c-c7db-4712-bc29-467a73b79445"
+        api_key = "28c4079a-528e-43a7-882d-a01d9fe57494"
 
         success = False
         i = 0
@@ -307,7 +308,7 @@ class NodePod:
         if hasattr(self, "socketIO") and self.socketIO:
             self.socketIO.disconnect()
         """
-        TODO include these if apply:        
+        TODO include these if apply to the POC:        
         if hasattr(self, "vpn_manager") and self.vpn_manager:
             self.vpn_manager.exit_vpn()
         if hasattr(self, "ssh_tunnels") and self.ssh_tunnels:
@@ -343,6 +344,10 @@ class NodePod:
             A list of dictionaries with information required to run the
             algorithm
         """
+        
+        """
+        PoC - No docker
+
         for task_result in task_results:
             try:
                 if not self.__docker.is_running(task_result["id"]):
@@ -355,7 +360,7 @@ class NodePod:
                     )
             except Exception:
                 self.log.exception("Error while syncing task queue")
-
+        """
 
     def share_node_details(self) -> None:
         """
@@ -400,9 +405,13 @@ class NodePod:
             labels.append(label)
             types[f"db_type_{label}"] = type_
             if type_ in ("csv", "parquet"):
+                """
+                TODO get the actual column names from the data files
                 col_names[f"columns_{label}"] = self.__docker.get_column_names(
                     label, type_
-                )
+                )                
+                """
+                col_names[f"columns_{label}"] = ["col_a","col_b","col_c"]
         config_to_share["database_labels"] = labels
         config_to_share["database_types"] = types
         if col_names:
@@ -410,6 +419,78 @@ class NodePod:
 
         self.log.debug("Sharing node configuration: %s", config_to_share)
         self.socketIO.emit("node_info_update", config_to_share, namespace="/tasks")        
+
+
+    def get_task_and_add_to_queue(self, task_id: int) -> None:            
+            """
+            Fetches (open) task with task_id from the server. The `task_id` is
+            delivered by the websocket-connection.
+
+            Addendum: this method is called by 
+
+
+            Parameters
+            ----------
+            task_id : int
+                Task identifier
+            """
+            # fetch open algorithm runs for this node
+            task_runs = self.client.run.list(
+                include_task=True, state="open", task_id=task_id
+            )
+
+            # add the tasks to the queue
+            self.__add_tasks_to_queue(task_runs)
+
+    def __add_tasks_to_queue(self, task_results: list[dict]) -> None:
+        """
+        Add a task to the queue.
+
+        #POC task_result: misleading variable name?
+
+        Parameters
+        ----------
+        taskresult : list[dict]
+            A list of dictionaries with information required to run the
+            algorithm
+        """
+        for task_result in task_results:
+            
+            #POC use the K8S container manager's 'is_running'
+            print(f">>>>>>>Here I'm supposed to check if task {task_result['id']} is not yet running")
+            """
+            try:
+                
+                
+                if not self.__docker.is_running(task_result["id"]):
+                    self.queue.put(task_result)
+                else:
+                    self.log.info(
+                        f"Not starting task {task_result['task']['id']} - "
+                        f"{task_result['task']['name']} as it is already "
+                        "running"
+                    )
+            except Exception:
+                self.log.exception("Error while syncing task queue")
+            """
+
+    def kill_containers(self, kill_info: dict) -> list[dict]:
+        #PoC TODO, using k8s container manager
+        """"
+        kill_info:
+            "kill_list": [
+                {
+                    "task_id": 3,
+                    "run_id": 3,
+                    "organization_id": 2
+                }
+            ],
+            "collaboration_id": 1
+        """
+        print(f">>>>>>>Here I'm supposed to kill a runnin job pod given this info: {json.dumps(kill_info, indent = 4)}")
+        return []
+
+
 
 if __name__ == '__main__':
 
