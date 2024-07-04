@@ -50,9 +50,9 @@ class NodePod:
         self._using_encryption = None
         
         self.client = NodeClient(
-                    host="https://v6-server.tail984a0.ts.net",
-                    port="443",
-                    path="/api",
+                    host=self.config.get("server_url"),
+                    port=self.config.get("port"),
+                    path=self.config.get("api_path"),
                 )
         self.log.info(f"Connecting server: {self.client.base_path}")
         self.queue = queue.Queue()
@@ -111,7 +111,7 @@ class NodePod:
         TIME_LIMIT_RETRY_CONNECT_NODE = 60
         SLEEP_BTWN_NODE_LOGIN_TRIES = 2
 
-        api_key = ""
+        api_key = self.ctx.config.get("api_key")
 
         success = False
         i = 0

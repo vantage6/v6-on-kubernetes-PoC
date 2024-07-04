@@ -1,8 +1,8 @@
 # API key used to authenticate at the server.
-api_key: XXXXXXX
+api_key: XXXX
 
 # URL of the vantage6 server
-server_url: https://cotopaxi.vantage6.ai
+server_url: https://v6-server.tail984a0.ts.net
 
 # port the server listens to
 port: 443
