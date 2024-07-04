@@ -111,7 +111,7 @@ class NodePod:
         TIME_LIMIT_RETRY_CONNECT_NODE = 60
         SLEEP_BTWN_NODE_LOGIN_TRIES = 2
 
-        api_key = "28c4079a-528e-43a7-882d-a01d9fe57494"
+        api_key = ""
 
         success = False
         i = 0
