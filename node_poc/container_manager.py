@@ -44,12 +44,10 @@ class Result(NamedTuple):
 
 class ContainerManager:
 
-    
-    
-    log = logging.getLogger(logger_name(__name__))
-
 
     def __init__(self):
+
+        self.log = logging.getLogger(logger_name(__name__))
 
         #v6-node configuration entries
         self.v6_config: dict
@@ -70,8 +68,8 @@ class ContainerManager:
             with open('node_config.yaml', 'r') as file:
                 self.v6_config = yaml.safe_load(file)
 
-            log.info(f'v6 settings:{self.v6_config}')
-            log.info('Using microk8s host configuration')            
+            self.log.info(f'v6 settings:{self.v6_config}')
+            self.log.info('Using microk8s host configuration')            
         
         #Instanced within a pod
         elif os.path.exists('/app/.kube/config'):

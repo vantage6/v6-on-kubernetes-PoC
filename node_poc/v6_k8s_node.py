@@ -15,6 +15,8 @@ from vantage6.node.globals import (
     TIME_LIMIT_INITIAL_CONNECTION_WEBSOCKET,
 )
 
+from container_manager import ContainerManager
+
 from socketio import Client as SocketIO
 import logging
 from logging import handlers
@@ -33,6 +35,9 @@ class NodePod:
     def __init__(self, ctx: NodeContext):
         self.log = logging.getLogger(logger_name(__name__))
         self.ctx = ctx
+
+        # Added for the PoC
+        self.k8s_container_manager = ContainerManager()
 
         # Initialize the node. If it crashes, shut down the parts that started
         # already
@@ -491,9 +496,100 @@ class NodePod:
         return []
 
 
+    def __start_task(self, task_incl_run: dict) -> None:
+        """
+        Start the docker image and notify the server that the task has been
+        started.
+
+        Parameters
+        ----------
+        task_incl_run : dict
+            A dictionary with information required to run the algorithm
+        """
+        task = task_incl_run["task"]
+        self.log.info("Starting task {id} - {name}".format(**task))
+
+        # notify that we are processing this task
+        self.client.set_task_start_time(task_incl_run["id"])
+
+        token = self.client.request_token_for_container(task["id"], task["image"])
+        token = token["container_token"]
+
+        # create a temporary volume for each job_id
+        #vol_name = self.ctx.docker_temporary_volume_name(task["job_id"])
+        #self.__docker.create_volume(vol_name)
+
+        # For some reason, if the key 'input' consists of JSON, it is
+        # automatically marshalled? This causes trouble, so we'll serialize it
+        # again.
+        # FIXME: should probably find & fix the root cause?
+        if type(task_incl_run["input"]) == dict:
+            task_incl_run["input"] = json.dumps(task_incl_run["input"])
+
+        # Run the container. This adds the created container/task to the list
+        # __docker.active_tasks
+        # PoC running with K8S Container Manager
+        """        
+        task_status, vpn_ports = self.__docker.run(
+            run_id=task_incl_run["id"],
+            task_info=task,
+            image=task["image"],
+            docker_input=task_incl_run["input"],
+            tmp_vol_name=vol_name,
+            token=token,
+            databases_to_use=task.get("databases", []),
+        )
+        """
+
+        # save task status to the server
+        update = {"status": task_status}
+        if task_status == TaskStatus.NOT_ALLOWED:
+            # set finished_at to now, so that the task is not picked up again
+            # (as the task is not started at all, unlike other crashes, it will
+            # never finish and hence not be set to finished)
+            update["finished_at"] = datetime.datetime.now().isoformat()
+        self.client.run.patch(id_=task_incl_run["id"], data=update)
+
+        # ensure that the /tasks namespace is connected. This may take a while
+        # (usually < 5s) when the socket just (re)connected
+        MAX_ATTEMPTS = 30
+        retries = 0
+        while "/tasks" not in self.socketIO.namespaces and retries < MAX_ATTEMPTS:
+            retries += 1
+            self.log.debug("Waiting for /tasks namespace to connect...")
+            time.sleep(1)
+        self.log.debug("Connected to /tasks namespace")
+        # in case the namespace is still not connected, the socket notification
+        # will not be sent to other nodes, but the task will still be processed
+
+        # send socket event to alert everyone of task status change
+        self.socketIO.emit(
+            "algorithm_status_change",
+            data={
+                "node_id": self.client.whoami.id_,
+                "status": task_status,
+                "run_id": task_incl_run["id"],
+                "task_id": task["id"],
+                "collaboration_id": self.client.collaboration_id,
+                "organization_id": self.client.whoami.organization_id,
+                "parent_id": get_parent_id(task),
+            },
+            namespace="/tasks",
+        )
+
+        if vpn_ports:
+            # Save port of VPN client container at which it redirects traffic
+            # to the algorithm container. First delete any existing port
+            # assignments in case algorithm has crashed
+            self.client.request(
+                "port", params={"run_id": task_incl_run["id"]}, method="DELETE"
+            )
+            for port in vpn_ports:
+                port["run_id"] = task_incl_run["id"]
+                self.client.request("port", method="POST", json=port)
+
 
 if __name__ == '__main__':
-
 
     ctx=NodeContext(instance_name='poc_instance', system_folders=False, config_file='configs/node_legacy_config.yaml')
     node = NodePod(ctx)
