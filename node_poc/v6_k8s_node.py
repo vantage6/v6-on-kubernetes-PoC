@@ -81,11 +81,6 @@ class NodePod:
         self.log.debug("Creating websocket connection with the server")
         self.connect_to_socket()
 
-        #TODO listen and process incoming messages
-        self.log.info("Init complete")
-        print("Keep running the main thread until the proxy server is listening")
-        t.join()
-
     def __print_connection_error_logs(self):
         """Print error message when node cannot find the server"""
         self.log.warning("Could not connect to the server. Retrying in 10 seconds")
@@ -529,9 +524,10 @@ class NodePod:
         
         try:
             while True:
-                self.log.info("Waiting for new tasks....")
+                self.log.info("********************  Waiting for new tasks....")
                 taskresult = self.queue.get()
-                self.log.info(f"New task received: {json.dump(taskresult,indent=4)}")
+                self.log.info(">>>>> New task received")
+                pprint.pp(taskresult)
                 self.__start_task(taskresult)
 
         except (KeyboardInterrupt, InterruptedError):
@@ -698,6 +694,7 @@ if __name__ == '__main__':
 
     ctx=NodeContext(instance_name='poc_instance', system_folders=False, config_file='configs/node_legacy_config.yaml')
     node = NodePod(ctx)
+    node.process_tasks_queue()
     print("Success")
     
 
