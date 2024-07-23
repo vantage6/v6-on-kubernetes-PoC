@@ -7,6 +7,8 @@ from vantage6.common.exceptions import AuthenticationException
 from vantage6.common import logger_name
 from vantage6.node.socket import NodeTaskNamespace
 from vantage6.cli.context.node import NodeContext
+from vantage6.common.task_status import TaskStatus
+from vantage6.node.util import get_parent_id
 
 from vantage6.node.globals import (
     NODE_PROXY_SERVER_HOSTNAME,
@@ -27,6 +29,9 @@ import time
 import os
 import queue
 import json
+import pprint
+import datetime
+import sys
 
 # Based on https://github.com/vantage6/vantage6/blob/be2e82b33e68db74304ea01c778094e6b40e671a/vantage6-node/vantage6/node/__init__.py#L1
 
@@ -326,8 +331,15 @@ class NodePod:
         self.log.info("Bye!")
 
 
+
     def sync_task_queue_with_server(self) -> None:
-        """Get all unprocessed tasks from the server for this node."""
+        """Get all unprocessed tasks from the server for this node.
+            Method Linked to a Socket.io event : on_sync)    
+            This method:
+                - Check for encryption settings
+                - Get 'open' tasks   (@Question What does 'open' mean in this context?)
+                - Add these task to the queue        
+        """
         assert self.client.cryptor, "Encrpytion has not been setup"
 
         # request open tasks from the server
@@ -339,9 +351,34 @@ class NodePod:
         self.log.info("Received %s tasks", self.queue._qsize())
 
 
+
+    def get_task_and_add_to_queue(self, task_id: int) -> None:            
+            """
+            Fetches (open) task with task_id from the server. The `task_id` is
+            delivered by the websocket-connection.
+
+            Linked to Socket.io event - on_new_task
+
+            Parameters
+            ----------
+            task_id : int
+                Task identifier
+            """
+            # fetch open algorithm runs for this node
+            task_runs = self.client.run.list(
+                include_task=True, state="open", task_id=task_id
+            )
+
+            # add the tasks to the queue
+            self.__add_tasks_to_queue(task_runs)
+
+
+
     def __add_tasks_to_queue(self, task_results: list[dict]) -> None:
         """
         Add a task to the queue.
+
+        #POC task_result: misleading variable name?
 
         Parameters
         ----------
@@ -349,13 +386,12 @@ class NodePod:
             A list of dictionaries with information required to run the
             algorithm
         """
-        
-        """
-        PoC - No docker
-
         for task_result in task_results:
+
             try:
-                if not self.__docker.is_running(task_result["id"]):
+                print(f"K8S >>>>> Is task {task_result['id']} running?:{self.k8s_container_manager.is_running(task_result['id'])}")             
+                
+                if not self.k8s_container_manager.is_running(task_result['id']):
                     self.queue.put(task_result)
                 else:
                     self.log.info(
@@ -365,7 +401,8 @@ class NodePod:
                     )
             except Exception:
                 self.log.exception("Error while syncing task queue")
-        """
+
+
 
     def share_node_details(self) -> None:
         """
@@ -426,61 +463,132 @@ class NodePod:
         self.socketIO.emit("node_info_update", config_to_share, namespace="/tasks")        
 
 
-    def get_task_and_add_to_queue(self, task_id: int) -> None:            
-            """
-            Fetches (open) task with task_id from the server. The `task_id` is
-            delivered by the websocket-connection.
-
-            Addendum: this method is called by 
 
 
-            Parameters
-            ----------
-            task_id : int
-                Task identifier
-            """
-            # fetch open algorithm runs for this node
-            task_runs = self.client.run.list(
-                include_task=True, state="open", task_id=task_id
-            )
 
-            # add the tasks to the queue
-            self.__add_tasks_to_queue(task_runs)
+    """"
+        task_results sample:
+        
+        {
+        'status': 'pending',
+        'node': {'id': 2,
+                'status': 'online',
+                'name': 'collab-of-k8s-enabled-orgs - kube-org-a',
+                'ip': None},
+        'results': {'id': 9, 'link': '/api/result/9', 'methods': ['GET', 'PATCH']},
+        'id': 9,
+        'task': {'status': 'pending',
+                'study': None,
+                'name': 'asd',
+                'results': '/api/result?task_id=9',
+                'init_user': {'id': 4,
+                                'link': '/api/user/4',
+                                'methods': ['DELETE', 'PATCH', 'GET']},
+                'description': '',
+                'children': '/api/task?parent_id=9',
+                'job_id': 9,
+                'databases': [{'label': 'default', 'parameters': '{}'}],
+                'id': 9,
+                'created_at': '2024-07-22T20:51:53.787815',
+                'init_org': {'id': 2,
+                            'link': '/api/organization/2',
+                            'methods': ['GET', 'PATCH']},
+                'image': 'harbor2.vantage6.ai/demo/average',
+                'parent': None,
+                'collaboration': {'id': 1,
+                                    'link': '/api/collaboration/1',
+                                    'methods': ['DELETE', 'PATCH', 'GET']}},
+        'assigned_at': '2024-07-22T20:51:53.874029',
+        'log': None,
+        'finished_at': None,
+        'input': b'{"method":"partial_average","kwargs":{"column_name":"col_a"}}',
+        'started_at': None,
+        'organization': {'id': 2,
+                        'link': '/api/organization/2',
+                        'methods': ['GET', 'PATCH']},
+    """
 
-    def __add_tasks_to_queue(self, task_results: list[dict]) -> None:
+
+    def process_tasks_queue(self) -> None:
+        # previously called def run_forever(self) -> None:
+
         """
-        Add a task to the queue.
+        Keep checking queue for incoming tasks (and execute them).
 
-        #POC task_result: misleading variable name?
+            Note: In the original version SIGINT/SIGTERM signals were also captured to guarantee a gracefuly shutdown of the containers.
+            E.g., aborting the node with CTRL-C would lead to a container execution inconsistent state, as these are handled by the node.
+            
+            In this new version the K8S server would keep running idependently of the node status. How to ensure consistency after an
+            abrupt failure should be further explored.
+
+
+            taskresult: misleading name? not the result of a task, but a task description
+
+        """
+        
+        
+        try:
+            while True:
+                self.log.info("Waiting for new tasks....")
+                taskresult = self.queue.get()
+                self.log.info(f"New task received: {json.dump(taskresult,indent=4)}")
+                self.__start_task(taskresult)
+
+        except (KeyboardInterrupt, InterruptedError):
+            self.log.info("Node is interrupted, shutting down...")
+            self.cleanup()
+            sys.exit()
+
+
+
+    def kill_containers(self, kill_info: dict) -> list[dict]:
+
+        """
+        Kill containers on instruction from socket event
 
         Parameters
         ----------
-        taskresult : list[dict]
-            A list of dictionaries with information required to run the
-            algorithm
-        """
-        for task_result in task_results:
-            
-            #POC use the K8S container manager's 'is_running'
-            print(f">>>>>>>Here I'm supposed to check if task {task_result['id']} is not yet running")
-            """
-            try:
-                
-                
-                if not self.__docker.is_running(task_result["id"]):
-                    self.queue.put(task_result)
-                else:
-                    self.log.info(
-                        f"Not starting task {task_result['task']['id']} - "
-                        f"{task_result['task']['name']} as it is already "
-                        "running"
-                    )
-            except Exception:
-                self.log.exception("Error while syncing task queue")
-            """
+        kill_info: dict
+            Dictionary received over websocket with instructions for which
+            tasks to kill
 
-    def kill_containers(self, kill_info: dict) -> list[dict]:
+        Returns
+        -------
+        list[dict]:
+            List of dictionaries with information on killed task (keys:
+            run_id, task_id and parent_id)
+        """
+        
+        """
+        if kill_info["collaboration_id"] != self.client.collaboration_id:
+            self.log.debug(
+                "Not killing tasks as this node is in another collaboration."
+            )
+            return []
+        elif "node_id" in kill_info and kill_info["node_id"] != self.client.whoami.id_:
+            self.log.debug(
+                "Not killing tasks as instructions to kill tasks were directed"
+                " at another node in this collaboration."
+            )
+            return []
+
+        # kill specific task if specified, else kill all algorithms
+        kill_list = kill_info.get("kill_list")
+
+        killed_algos = self.__docker.kill_tasks(
+            org_id=self.client.whoami.organization_id, kill_list=kill_list
+        )
+        # update status of killed tasks
+        for killed_algo in killed_algos:
+            self.client.run.patch(
+                id_=killed_algo.run_id, data={"status": TaskStatus.KILLED}
+            )
+        return killed_algos
+        """
         #PoC TODO, using k8s container manager
+        print(f">>>>>>>Here I'm supposed to kill a runnin job pod given this info: {json.dumps(kill_info, indent = 4)}")
+        return []
+        
         """"
         kill_info:
             "kill_list": [
@@ -491,10 +599,8 @@ class NodePod:
                 }
             ],
             "collaboration_id": 1
+    
         """
-        print(f">>>>>>>Here I'm supposed to kill a runnin job pod given this info: {json.dumps(kill_info, indent = 4)}")
-        return []
-
 
     def __start_task(self, task_incl_run: dict) -> None:
         """
@@ -529,17 +635,16 @@ class NodePod:
         # Run the container. This adds the created container/task to the list
         # __docker.active_tasks
         # PoC running with K8S Container Manager
-        """        
-        task_status, vpn_ports = self.__docker.run(
+        
+        task_status, vpn_ports = self.k8s_container_manager.run(
             run_id=task_incl_run["id"],
             task_info=task,
             image=task["image"],
             docker_input=task_incl_run["input"],
-            tmp_vol_name=vol_name,
+            tmp_vol_name="****tmp_vol_name key is deprecated",
             token=token,
             databases_to_use=task.get("databases", []),
         )
-        """
 
         # save task status to the server
         update = {"status": task_status}

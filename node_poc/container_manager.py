@@ -12,12 +12,13 @@ import yaml
 import logging
 import time
 import json
+import pprint
 
 
+#logging.basicConfig(level=logging.INFO)
+#log = logging.getLogger(logger_name(__name__))
 
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger(logger_name(__name__))
-
+# Taken from docker_manager.py
 class Result(NamedTuple):
     """
     Data class to store the result of the docker image.
@@ -40,6 +41,23 @@ class Result(NamedTuple):
     data: str
     status: str
     parent_id: int | None
+
+# Taken from docker_manager.py
+class ToBeKilled(NamedTuple):
+    """Data class to store which tasks should be killed"""
+
+    task_id: int
+    run_id: int
+    organization_id: int
+
+# Taken from docker_manager.py
+class KilledRun(NamedTuple):
+    """Data class to store which algorithms have been killed"""
+
+    run_id: int
+    task_id: int
+    parent_id: int
+
 
 
 class ContainerManager:
@@ -68,8 +86,9 @@ class ContainerManager:
             with open('node_config.yaml', 'r') as file:
                 self.v6_config = yaml.safe_load(file)
 
-            self.log.info(f'v6 settings:{self.v6_config}')
-            self.log.info('Using microk8s host configuration')            
+            self.log.info(f'>>>> K8S POC - v6 settings:{self.v6_config}')
+            self.log.info('>>>> Using microk8s host configuration')  
+            pprint.pp(self.v6_config)          
         
         #Instanced within a pod
         elif os.path.exists('/app/.kube/config'):
@@ -79,8 +98,8 @@ class ContainerManager:
             config.load_kube_config('/app/.kube/config')            
             with open('/app/.v6node/node_config.yaml', 'r') as file:
                 self.v6_config = yaml.safe_load(file)
-            print(f'v6 settings:{self.v6_config}')
-            print('Microk8s using configuration file bind to a POD')            
+            self.log.info(f'v6 settings:{self.v6_config}')
+            self.log.info('Microk8s using configuration file bind to a POD')            
         
         # before a task is executed it gets exposed to these policies
         self._policies = self._setup_policies(config)
@@ -710,9 +729,9 @@ class ContainerManager:
     #) -> list[KilledRun]:
 
 
-    #def kill_tasks(
-    #    self, org_id: int, kill_list: list[ToBeKilled] = None
-    #) -> list[KilledRun]:
+    def kill_tasks(
+        self, org_id: int, kill_list: list[ToBeKilled] = None
+    ) -> list[KilledRun]:
         """
         Kill tasks currently running on this node.
 
@@ -728,6 +747,78 @@ class ContainerManager:
         -------
         list[KilledRun]
             List of dictionaries with information on killed tasks
+        """
+        """
+        if kill_list:
+            killed_runs = self.kill_selected_tasks(org_id=org_id, kill_list=kill_list)
+        else:
+            # received instruction to kill all tasks on this node
+            self.log.warn(
+                "Received instruction from server to kill all algorithms "
+                "running on this node. Executing that now..."
+            )
+            killed_runs = self.cleanup_tasks()
+            if len(killed_runs):
+                self.log.warn(
+                    "Killed the following run ids as instructed via socket:"
+                    f" {', '.join([str(r.run_id) for r in killed_runs])}"
+                )
+            else:
+                self.log.warn("Instructed to kill tasks but none were running")
+        return killed_runs
+        """
+
+    def kill_selected_tasks(
+        self, org_id: int, kill_list: list[ToBeKilled] = None
+    ) -> list[KilledRun]:
+        """
+        Kill tasks specified by a kill list, if they are currently running on
+        this node
+
+        Parameters
+        ----------
+        org_id: int
+            The organization id of this node
+        kill_list: list[ToBeKilled]
+            A list of info about tasks that should be killed.
+
+        Returns
+        -------
+        list[KilledRun]
+            List with information on killed tasks
+        """
+        """
+        killed_list = []
+        for container_to_kill in kill_list:
+            if container_to_kill["organization_id"] != org_id:
+                continue  # this run is on another node
+            # find the task
+            task = next(
+                (
+                    t
+                    for t in self.active_tasks
+                    if t.run_id == container_to_kill["run_id"]
+                ),
+                None,
+            )
+            if task:
+                self.log.info(f"Killing containers for run_id={task.run_id}")
+                self.active_tasks.remove(task)
+                task.cleanup()
+                killed_list.append(
+                    KilledRun(
+                        run_id=task.run_id,
+                        task_id=task.task_id,
+                        parent_id=task.parent_id,
+                    )
+                )
+            else:
+                self.log.warn(
+                    "Received instruction to kill run_id="
+                    f"{container_to_kill['run_id']}, but it was not "
+                    "found running on this node."
+                )
+        return killed_list
         """
 
 
