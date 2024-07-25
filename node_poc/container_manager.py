@@ -145,30 +145,6 @@ class ContainerManager:
 
 
 
-    def _create_io_files(self,token:str,task_folder_path:str) -> None:
-        """"
-        Create the IO files required by the v6 algorithm (the path to these files are sent as env. variables)
-
-        """
-
-        if isinstance(self.docker_input, str):
-            self.docker_input = self.docker_input.encode("utf8")
-
-        # Create I/O files & token for the algorithm container
-        self.log.debug("prepare IO files in POD volume")
-        io_files = [
-            ("input", self.docker_input),
-            ("output", b""),
-            ("token", token.encode("ascii")),
-        ]
-
-        for filename, data in io_files:
-            filepath = os.path.join(task_folder_path, filename)
-
-            with open(filepath, "wb") as fp:
-                fp.write(data)
-
-
 
     def run(self, run_id: int, task_info: dict, image: str,
             docker_input: bytes, tmp_vol_name: str, token: str,
@@ -259,7 +235,7 @@ class ContainerManager:
 
         str_run_id = str(run_id)
         
-        dinput = json.loads(docker_input)
+        #dinput = json.loads(docker_input)
 
         #task_args = list(task_info.values())
 
@@ -290,7 +266,7 @@ class ContainerManager:
                             image=image,
                             #standard container command line
                             #command=["python","app.py"],
-                            args=task_info,
+                            #args=task_info,
                             tty = True,
                             #args=["/app/data/output.txt","1000","5"],
                             volume_mounts=_volume_mounts,
@@ -406,9 +382,11 @@ class ContainerManager:
         'docker_input' as the 'input' file, and 'token' 
         """
 
+        print(f"Creating {alg_input_file_path} and {token_file_path}")
+
         # Check if the files already exist
-        if Path(alg_input_file_path).exists() or Path(token_file_path).exists():
-            raise Exception(f"Input file {alg_input_file_path} or Token file {token_file_path} already exist. Cannot overwrite.")
+        #if Path(alg_input_file_path).exists() or Path(token_file_path).exists():
+        #    raise Exception(f"Input file {alg_input_file_path} or Token file {token_file_path} already exist. Cannot overwrite.")
 
         # Create the directories if they don't exist (if there are no writing rights this will rise)
         alg_input_dir = Path(alg_input_file_path).parent
@@ -420,7 +398,7 @@ class ContainerManager:
         with open(alg_input_file_path, 'wb') as alg_input_file:
             alg_input_file.write(docker_input)
             
-        with open(token_file_path, 'w') as token_file:
+        with open(token_file_path, 'wb') as token_file:
             token_file.write(token.encode("ascii"))
 
 
@@ -470,14 +448,13 @@ class ContainerManager:
         output_volume = client.V1Volume(
             name=f'task-{run_id}-output',                    
             host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'output')),
-            type='FileOrCreate'           
         )
         volumes.append(output_volume)
         # Volume mount path for i/o data (/app is the WORKDIR path of v6-node's container)
         output_volume_mount = client.V1VolumeMount(
             #standard containers volume mount location
             name=f'task-{run_id}-output',
-            mount_path='/app/output'            
+            mount_path='/app/output',
         )
 
         vol_mounts.append(output_volume_mount)
@@ -489,7 +466,6 @@ class ContainerManager:
         alg_input_volume = client.V1Volume(
             name=f'task-{run_id}-input',                    
             host_path=client.V1HostPathVolumeSource(path=_input_file_path),
-            type='File'           
         )
         volumes.append(alg_input_volume)
                 
@@ -509,7 +485,6 @@ class ContainerManager:
         token_volume = client.V1Volume(
             name=f'token-{run_id}-input',                    
             host_path=client.V1HostPathVolumeSource(path=_token_file_path),
-            type='File'           
         )
         volumes.append(token_volume)
                 
@@ -527,7 +502,6 @@ class ContainerManager:
         tmp_volume = client.V1Volume(
             name=f'task-{run_id}-tmp',
             host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'tmp')),
-            type='DirectoryOrCreate'
         )
 
         volumes.append(tmp_volume)
@@ -544,6 +518,7 @@ class ContainerManager:
 
         # Bind-mounting all the CSV files (read only) defined on the configuration file 
         # TODO bind other input data types
+        # TODO include only the ones given in the 'databases_to_use parameter
         csv_input_files = list(filter(lambda o: (o['type']=='csv'), self.v6_config['databases']))
 
         #TODO for the moment only the 'default' (still not sure about the format of this ENV variable)
@@ -554,7 +529,6 @@ class ContainerManager:
             _volume = client.V1Volume(
                 name=f"task-{run_id}-input-{csv_input['label']}",
                 host_path=client.V1HostPathVolumeSource(csv_input['uri']),
-                type="File"
             )
 
             volumes.append(_volume)
