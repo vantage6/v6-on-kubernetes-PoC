@@ -1,5 +1,6 @@
 from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
+from kubernetes.client import V1EnvVar
 from vantage6.common.task_status import TaskStatus
 from typing import Tuple, List
 from vantage6.common.task_status import TaskStatus, has_task_failed
@@ -142,6 +143,31 @@ class ContainerManager:
 
 
 
+    def _create_io_files(self,token:str,task_folder_path:str) -> None:
+        """"
+        Create the IO files required by the v6 algorithm (the path to these files are sent as env. variables)
+
+        """
+
+        if isinstance(self.docker_input, str):
+            self.docker_input = self.docker_input.encode("utf8")
+
+        # Create I/O files & token for the algorithm container
+        self.log.debug("prepare IO files in POD volume")
+        io_files = [
+            ("input", self.docker_input),
+            ("output", b""),
+            ("token", token.encode("ascii")),
+        ]
+
+        for filename, data in io_files:
+            filepath = os.path.join(task_folder_path, filename)
+
+            with open(filepath, "wb") as fp:
+                fp.write(data)
+
+
+
     def run(self, run_id: int, task_info: dict, image: str,
             docker_input: bytes, tmp_vol_name: str, token: str,
             databases_to_use: list[str]
@@ -175,6 +201,45 @@ class ContainerManager:
             container (``None`` if VPN is not set up).
         """
 
+        """
+        Current V6 algorithm dispatch sequence:
+                
+            __start_task(task_incl_run)
+                __docker.run(
+                    ...
+                     'docker_input' <- task_incl_run["input"]
+                    ... 
+                )
+                -->
+                    task.run(
+                        docker_input <- docker_input
+                    )
+                    -->
+                        - Create input, output and token files: https://github.com/vantage6/vantage6/blob/3b38ac1e738a95cda1d78d90cc34f4f1190e9cdb/vantage6-node/vantage6/node/docker/task_manager.py#L428
+                            - input: docker_input
+                            - output: empty file
+                            - token: token.encode("ascii")
+                        - Set environment variables: https://github.com/vantage6/vantage6/blob/2a16890bde9abaf61cf134b00d8553ff5b5ce276/vantage6-node/vantage6/node/docker/task_manager.py#L477
+                            "INPUT_FILE": 
+                            "OUTPUT_FILE":
+                            "TOKEN_FILE": 
+                            "TEMPORARY_FOLDER": 
+                            "HOST": (proxy/server _host)
+                            "PORT": (server port)
+                            "API_PATH": ""
+                            
+                            "USER_REQUESTED_DATABASE_LABELS"
+                            "<LABEL>_DATABASE_URI"
+                            "<LABEL>_DATABASE_TYPE"
+                            "<LABEL>_DB_PARAM_<ADDITIONAL_PARAMETER>"
+                        - Create and run an image container: https://github.com/vantage6/vantage6/blob/2a16890bde9abaf61cf134b00d8553ff5b5ce276/vantage6-node/vantage6/node/docker/task_manager.py#L344
+
+
+                
+        """
+
+
+
         #Usage context: https://github.com/vantage6/vantage6/blob/b0c961c8a060d9ea656e078e685a8e7d0560ef44/vantage6-node/vantage6/node/__init__.py#L349
 
 
@@ -191,20 +256,43 @@ class ContainerManager:
             return TaskStatus.ACTIVE, None
 
         str_run_id = str(run_id)
+        
+        dinput = json.loads(docker_input)
 
-        task_args = list(task_info.values())
+        #task_args = list(task_info.values())
+
+        # The algorithm wrapper eventually uses this
+        # https://github.com/vantage6/vantage6/blob/3b38ac1e738a95cda1d78d90cc34f4f1190e9cdb/vantage6-algorithm-tools/vantage6/algorithm/tools/wrap.py#L76
+
 
         _volumes, _volume_mounts = self._create_volume_mounts(str_run_id)
-
+        
+        # Setting the environment variables required by V6 algorithms.
+        #   As these environment variables are used within the container/POD environment, file paths are relative 
+        #   to the mount paths (i.e., the container's file system) created by the method above (_crate_volume_mounts)
+        #   
+        env_vars = [
+            V1EnvVar(name="INPUT_FILE", value='/app/input'),
+            V1EnvVar(name="OUTPUT_FILE", value='/app/output'),
+            V1EnvVar(name="TOKEN_FILE", value='/app/token'),
+            V1EnvVar(name="TEMPORARY_FOLDER", value='/app/temporal'),
+                #TODO Use the FQDN of the proxy by default
+            V1EnvVar(name="HOST", value=os.environ.get("PROXY_SERVER_HOST","xxxxxxxxxx")),
+            V1EnvVar(name="PORT", value=os.environ.get("PROXY_SERVER_PORT", 8080)),
+            V1EnvVar(name="API_PATH", value='/api'),
+        ]
+                            
         container = client.V1Container(
                             name=str_run_id,
                             image=image,
                             #standard container command line
-                            command=["python","app.py"],
-                            args=task_args,
+                            #command=["python","app.py"],
+                            args=task_info,
                             tty = True,
                             #args=["/app/data/output.txt","1000","5"],
-                            volume_mounts=_volume_mounts
+                            volume_mounts=_volume_mounts,
+                            #environment variables required by the algorithm container
+                            env=env_vars
                         )
 
 
@@ -225,6 +313,9 @@ class ContainerManager:
                 backoff_limit=1,
             ),
         )
+
+        print("######>>>>>>>>>")
+        pprint.pp(job)
 
         self.batch_api.create_namespaced_job(namespace="v6-jobs", body=job)
 
