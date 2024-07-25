@@ -215,9 +215,6 @@ class ContainerManager:
 
                 
         """
-
-
-
         #Usage context: https://github.com/vantage6/vantage6/blob/b0c961c8a060d9ea656e078e685a8e7d0560ef44/vantage6-node/vantage6/node/__init__.py#L349
 
 
@@ -235,31 +232,22 @@ class ContainerManager:
 
         str_run_id = str(run_id)
         
-        #dinput = json.loads(docker_input)
-
-        #task_args = list(task_info.values())
-
-        # The algorithm wrapper eventually uses this
-        # https://github.com/vantage6/vantage6/blob/3b38ac1e738a95cda1d78d90cc34f4f1190e9cdb/vantage6-algorithm-tools/vantage6/algorithm/tools/wrap.py#L76
-
-
         _io_related_env_variables: List[V1EnvVar]
 
-        _volumes, _volume_mounts, _io_related_env_variables = self._create_volume_mounts(run_id=str_run_id,docker_input=docker_input,token=token)
+        _volumes, _volume_mounts, _io_related_env_variables = self._create_volume_mounts(run_id=str_run_id,docker_input=docker_input,token=token,databases_to_use=databases_to_use)
         
         # Setting the environment variables required by V6 algorithms.
         #   As these environment variables are used within the container/POD environment, file paths are relative 
         #   to the mount paths (i.e., the container's file system) created by the method above (_crate_volume_mounts)
         #   
         env_vars: List[V1EnvVar] = [
-                                                        #TODO Use the FQDN of the proxy by default
+                                                        #TODO Replace xxxxx with the FQDN of the proxy
             client.V1EnvVar(name="HOST", value=os.environ.get("PROXY_SERVER_HOST","xxxxxxxxxx")),
-            client.V1EnvVar(name="PORT", value=os.environ.get("PROXY_SERVER_PORT", 8080)),
+            client.V1EnvVar(name="PORT", value=os.environ.get("PROXY_SERVER_PORT", '8080')),
             client.V1EnvVar(name="API_PATH", value=''),
         ]
-
+        
         env_vars.extend(_io_related_env_variables)
-
 
         container = client.V1Container(
                             name=str_run_id,
@@ -403,7 +391,7 @@ class ContainerManager:
             token_file.write(token.encode("ascii"))
 
 
-    def _create_volume_mounts(self,run_id:str,docker_input:bytes,token:str)-> Tuple[  List[client.V1Volume], List[client.V1VolumeMount], List[V1EnvVar]   ]:
+    def _create_volume_mounts(self,run_id:str,docker_input:bytes,token:str,databases_to_use:list[str])-> Tuple[  List[client.V1Volume], List[client.V1VolumeMount], List[V1EnvVar]   ]:
         """
         Define all the mounts required by the algorithm/job: input files (csv), output, and temporal data
 
@@ -517,13 +505,20 @@ class ContainerManager:
 
         io_env_vars.append(client.V1EnvVar(name="TEMPORARY_FOLDER", value='/app/tmp'))
 
+
+        ##### Environment variable with the labels of the databases to be used
+        labels_list = []
+        for db in databases_to_use:
+            labels_list.append(db["label"])
+        labels_str = ",".join(labels_list)
+        io_env_vars.append(client.V1EnvVar(name="USER_REQUESTED_DATABASE_LABELS", value='default'))
+        #io_env_vars.append(client.V1EnvVar(name="USER_REQUESTED_DATABASE_LABELS", value=labels_str))
+
+
         # Bind-mounting all the CSV files (read only) defined on the configuration file 
         # TODO bind other input data types
         # TODO include only the ones given in the 'databases_to_use parameter
         csv_input_files = list(filter(lambda o: (o['type']=='csv'), self.v6_config['databases']))
-
-        #TODO for the moment only the 'default' (still not sure about the format of this ENV variable)
-        io_env_vars.append(client.V1EnvVar(name="USER_REQUESTED_DATABASE_LABELS", value='default'))
 
         for csv_input in csv_input_files:
 
@@ -542,8 +537,8 @@ class ContainerManager:
 
             vol_mounts.append(_volume_mount)
 
-            io_env_vars.append(client.V1EnvVar(name=f"{csv_input['label']}_DATABASE_URI", value=f"/app/input/csv/{csv_input['label']}"))
-            io_env_vars.append(client.V1EnvVar(name=f"{csv_input['label']}_DATABASE_TYPE", value="csv"))
+            io_env_vars.append(client.V1EnvVar(name=f"{csv_input['label'].upper()}_DATABASE_URI", value=f"/app/input/csv/{csv_input['label']}"))
+            io_env_vars.append(client.V1EnvVar(name=f"{csv_input['label'].upper()}_DATABASE_TYPE", value="csv"))
 
         return volumes,vol_mounts,io_env_vars
     
