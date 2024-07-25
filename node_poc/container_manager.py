@@ -7,6 +7,8 @@ from vantage6.common.task_status import TaskStatus, has_task_failed
 from vantage6.common import logger_name
 from typing import NamedTuple
 from enum import Enum
+from pathlib import Path
+
 import re
 import os
 import yaml
@@ -267,14 +269,14 @@ class ContainerManager:
 
         _io_related_env_variables: List[V1EnvVar]
 
-        _volumes, _volume_mounts, _io_related_env_variables = self._create_volume_mounts(str_run_id)
+        _volumes, _volume_mounts, _io_related_env_variables = self._create_volume_mounts(run_id=str_run_id,docker_input=docker_input,token=token)
         
         # Setting the environment variables required by V6 algorithms.
         #   As these environment variables are used within the container/POD environment, file paths are relative 
         #   to the mount paths (i.e., the container's file system) created by the method above (_crate_volume_mounts)
         #   
         env_vars: List[V1EnvVar] = [
-                #TODO Use the FQDN of the proxy by default
+                                                        #TODO Use the FQDN of the proxy by default
             V1EnvVar(name="HOST", value=os.environ.get("PROXY_SERVER_HOST","xxxxxxxxxx")),
             V1EnvVar(name="PORT", value=os.environ.get("PROXY_SERVER_PORT", 8080)),
             V1EnvVar(name="API_PATH", value='/api'),
@@ -398,7 +400,31 @@ class ContainerManager:
         return TaskStatus.UNKNOWN_ERROR    
     
 
-    def _create_volume_mounts(self,run_id:str)-> Tuple[  List[client.V1Volume], List[client.V1VolumeMount], List[V1EnvVar]   ]:
+    def _create_io_files(self,alg_input_file_path: str, docker_input: bytes, token_file_path: str, token: str):
+        """
+        Create the files required by the algorithms, which will be bound to the PODs through a volume mount:
+        'docker_input' as the 'input' file, and 'token' 
+        """
+
+        # Check if the files already exist
+        if Path(alg_input_file_path).exists() or Path(token_file_path).exists():
+            raise Exception(f"Input file {alg_input_file_path} or Token file {token_file_path} already exist. Cannot overwrite.")
+
+        # Create the directories if they don't exist (if there are no writing rights this will rise)
+        alg_input_dir = Path(alg_input_file_path).parent
+        token_dir = Path(token_file_path).parent
+        
+        alg_input_dir.mkdir(parents=True, exist_ok=True)
+        token_dir.mkdir(parents=True, exist_ok=True)
+        
+        with open(alg_input_file_path, 'wb') as alg_input_file:
+            alg_input_file.write(docker_input)
+            
+        with open(token_file_path, 'w') as token_file:
+            token_file.write(token.encode("ascii"))
+
+
+    def _create_volume_mounts(self,run_id:str,docker_input:bytes,token:str)-> Tuple[  List[client.V1Volume], List[client.V1VolumeMount], List[V1EnvVar]   ]:
         """
         Define all the mounts required by the algorithm/job: input files (csv), output, and temporal data
 
@@ -421,6 +447,16 @@ class ContainerManager:
         vol_mounts:List[client.V1VolumeMount] = []
         io_env_vars:List[V1EnvVar] = []
         
+        _input_file_path = os.path.join(self.v6_config['task_dir'],run_id,'input')
+        _token_file_path = os.path.join(self.v6_config['task_dir'],run_id,'token')
+
+        #Create algorithm's input and token files before creating volume mounts with them.
+        self._create_io_files(
+            alg_input_file_path=_input_file_path,
+            docker_input=docker_input,
+            token_file_path=_token_file_path,
+            token=token,
+        )
 
         # Define a volume for input/output for this run. Following v6 convention, this is a volume bind to a
         # sub-folder created for the given run_id (i.e., the content will be shared by all the
@@ -428,7 +464,8 @@ class ContainerManager:
 
         # Files or folders will be automatically created as described on https://kubernetes.io/docs/concepts/storage/volumes/#hostpath-volume-types
 
-        # Volume for the output file (this creates an empty file)
+
+        ##### Volume for the output file (this creates an empty file)
         
         output_volume = client.V1Volume(
             name=f'task-{run_id}-output',                    
@@ -446,13 +483,13 @@ class ContainerManager:
         vol_mounts.append(output_volume_mount)
         io_env_vars.append(V1EnvVar(name="OUTPUT_FILE", value='/app/output'))
 
-        # Volume and volume mount for the INPUT file (this creates an empty file, in which the input parameters user by the algorithm
+        ##### Volume for the INPUT file (this creates an empty file, in which the input parameters user by the algorithm
         # will be written before starting the task.
 
         alg_input_volume = client.V1Volume(
             name=f'task-{run_id}-input',                    
-            host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'input')),
-            type='FileOrCreate'           
+            host_path=client.V1HostPathVolumeSource(path=_input_file_path),
+            type='File'           
         )
         volumes.append(alg_input_volume)
                 
@@ -465,7 +502,28 @@ class ContainerManager:
         vol_mounts.append(alg_input_volume_mount)
         io_env_vars.append(V1EnvVar(name="INPUT_FILE", value='/app/input'))
 
-        # Define the volume for temporal data 
+
+        ####### Volume and volume mount for the TOKEN file. This creates an empty file first, 
+        # the Token should be written on it before launching the Job
+
+        token_volume = client.V1Volume(
+            name=f'token-{run_id}-input',                    
+            host_path=client.V1HostPathVolumeSource(path=_token_file_path),
+            type='File'           
+        )
+        volumes.append(token_volume)
+                
+        token_volume_mount = client.V1VolumeMount(
+            #standard containers volume mount location
+            name=f'token-{run_id}-input',
+            mount_path='/app/token'            
+        )
+
+        vol_mounts.append(token_volume_mount)
+        io_env_vars.append(V1EnvVar(name="TOKEN_FILE", value='/app/token'))
+
+
+        ######## Volume for temporal data folder        
         tmp_volume = client.V1Volume(
             name=f'task-{run_id}-tmp',
             host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'tmp')),
@@ -474,7 +532,6 @@ class ContainerManager:
 
         volumes.append(tmp_volume)
 
-        # Define the volume mount for temporary data
         tmp_volume_mount = client.V1VolumeMount(
             #standard containers volume mount location
             mount_path='/app/tmp',
@@ -485,7 +542,7 @@ class ContainerManager:
 
         io_env_vars.append(V1EnvVar(name="TEMPORARY_FOLDER", value='/app/tmp'))
 
-        # Bind-mount all the CSV files (read only) defined on the configuration file 
+        # Bind-mounting all the CSV files (read only) defined on the configuration file 
         # TODO bind other input data types
         csv_input_files = list(filter(lambda o: (o['type']=='csv'), self.v6_config['databases']))
 
