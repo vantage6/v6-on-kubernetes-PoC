@@ -253,9 +253,9 @@ class ContainerManager:
         #   
         env_vars: List[V1EnvVar] = [
                                                         #TODO Use the FQDN of the proxy by default
-            V1EnvVar(name="HOST", value=os.environ.get("PROXY_SERVER_HOST","xxxxxxxxxx")),
-            V1EnvVar(name="PORT", value=os.environ.get("PROXY_SERVER_PORT", 8080)),
-            V1EnvVar(name="API_PATH", value='/api'),
+            client.V1EnvVar(name="HOST", value=os.environ.get("PROXY_SERVER_HOST","xxxxxxxxxx")),
+            client.V1EnvVar(name="PORT", value=os.environ.get("PROXY_SERVER_PORT", 8080)),
+            client.V1EnvVar(name="API_PATH", value=''),
         ]
 
         env_vars.extend(_io_related_env_variables)
@@ -271,6 +271,7 @@ class ContainerManager:
                             #args=["/app/data/output.txt","1000","5"],
                             volume_mounts=_volume_mounts,
                             #environment variables required by the algorithm container
+                            #env=env_vars
                             env=env_vars
                         )
 
@@ -458,7 +459,7 @@ class ContainerManager:
         )
 
         vol_mounts.append(output_volume_mount)
-        io_env_vars.append(V1EnvVar(name="OUTPUT_FILE", value='/app/output'))
+        io_env_vars.append(client.V1EnvVar(name="OUTPUT_FILE", value='/app/output'))
 
         ##### Volume for the INPUT file (this creates an empty file, in which the input parameters user by the algorithm
         # will be written before starting the task.
@@ -476,7 +477,7 @@ class ContainerManager:
         )
 
         vol_mounts.append(alg_input_volume_mount)
-        io_env_vars.append(V1EnvVar(name="INPUT_FILE", value='/app/input'))
+        io_env_vars.append(client.V1EnvVar(name="INPUT_FILE", value='/app/input'))
 
 
         ####### Volume and volume mount for the TOKEN file. This creates an empty file first, 
@@ -495,7 +496,7 @@ class ContainerManager:
         )
 
         vol_mounts.append(token_volume_mount)
-        io_env_vars.append(V1EnvVar(name="TOKEN_FILE", value='/app/token'))
+        io_env_vars.append(client.V1EnvVar(name="TOKEN_FILE", value='/app/token'))
 
 
         ######## Volume for temporal data folder        
@@ -514,7 +515,7 @@ class ContainerManager:
 
         vol_mounts.append(tmp_volume_mount)
 
-        io_env_vars.append(V1EnvVar(name="TEMPORARY_FOLDER", value='/app/tmp'))
+        io_env_vars.append(client.V1EnvVar(name="TEMPORARY_FOLDER", value='/app/tmp'))
 
         # Bind-mounting all the CSV files (read only) defined on the configuration file 
         # TODO bind other input data types
@@ -522,7 +523,7 @@ class ContainerManager:
         csv_input_files = list(filter(lambda o: (o['type']=='csv'), self.v6_config['databases']))
 
         #TODO for the moment only the 'default' (still not sure about the format of this ENV variable)
-        io_env_vars.append(V1EnvVar(name="USER_REQUESTED_DATABASE_LABELS", value='default'))
+        io_env_vars.append(client.V1EnvVar(name="USER_REQUESTED_DATABASE_LABELS", value='default'))
 
         for csv_input in csv_input_files:
 
@@ -541,8 +542,8 @@ class ContainerManager:
 
             vol_mounts.append(_volume_mount)
 
-            io_env_vars.append(V1EnvVar(name=f"{csv_input['label']}_DATABASE_URI", value=f"/app/input/csv/{csv_input['label']}"))
-            io_env_vars.append(V1EnvVar(name=f"{csv_input['label']}_DATABASE_TYPE", value="csv"))
+            io_env_vars.append(client.V1EnvVar(name=f"{csv_input['label']}_DATABASE_URI", value=f"/app/input/csv/{csv_input['label']}"))
+            io_env_vars.append(client.V1EnvVar(name=f"{csv_input['label']}_DATABASE_TYPE", value="csv"))
 
         return volumes,vol_mounts,io_env_vars
     
