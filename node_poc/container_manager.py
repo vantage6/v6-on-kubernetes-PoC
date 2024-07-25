@@ -265,23 +265,24 @@ class ContainerManager:
         # https://github.com/vantage6/vantage6/blob/3b38ac1e738a95cda1d78d90cc34f4f1190e9cdb/vantage6-algorithm-tools/vantage6/algorithm/tools/wrap.py#L76
 
 
-        _volumes, _volume_mounts = self._create_volume_mounts(str_run_id)
+        _io_related_env_variables: List[V1EnvVar]
+
+        _volumes, _volume_mounts, _io_related_env_variables = self._create_volume_mounts(str_run_id)
         
         # Setting the environment variables required by V6 algorithms.
         #   As these environment variables are used within the container/POD environment, file paths are relative 
         #   to the mount paths (i.e., the container's file system) created by the method above (_crate_volume_mounts)
         #   
-        env_vars = [
-            V1EnvVar(name="INPUT_FILE", value='/app/input'),
-            V1EnvVar(name="OUTPUT_FILE", value='/app/output'),
-            V1EnvVar(name="TOKEN_FILE", value='/app/token'),
-            V1EnvVar(name="TEMPORARY_FOLDER", value='/app/temporal'),
+        env_vars: List[V1EnvVar] = [
                 #TODO Use the FQDN of the proxy by default
             V1EnvVar(name="HOST", value=os.environ.get("PROXY_SERVER_HOST","xxxxxxxxxx")),
             V1EnvVar(name="PORT", value=os.environ.get("PROXY_SERVER_PORT", 8080)),
             V1EnvVar(name="API_PATH", value='/api'),
         ]
-                            
+
+        env_vars.extend(_io_related_env_variables)
+
+
         container = client.V1Container(
                             name=str_run_id,
                             image=image,
@@ -397,49 +398,78 @@ class ContainerManager:
         return TaskStatus.UNKNOWN_ERROR    
     
 
-    def _create_volume_mounts(self,run_id:str)->Tuple[List[client.V1Volume],List[client.V1VolumeMount]]:
+    def _create_volume_mounts(self,run_id:str)-> Tuple[  List[client.V1Volume], List[client.V1VolumeMount], List[V1EnvVar]   ]:
         """
         Define all the mounts required by the algorithm/job: input files (csv), output, and temporal data
+
+        Returns: a tuple with (1) the created volume names and their corresponding volume mounts and (2) the list
+        of the environment variables required by the algorithms to use such mounts.
+
+         Note: in the following Volume-claims could be used insted of 'host_path' volumes to decouple vantage6 file
+          management from the storage provider (NFS, GCP, etc). However, persitent-volumes (from which 
+          volume-claims are be created), present a risk when used on local file systems. In particular,
+          if two VC are created from the same PV, both would end sharing the same files. 
+
+          e.g. : Define the volume for temporal data 
+          tmp_volume = client.V1Volume(
+            name=f'task-{str_run_id}-tmp',
+            persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(claim_name=tmp_vol_name)
+          )
+
         """
         volumes :List[client.V1Volume] = []
         vol_mounts:List[client.V1VolumeMount] = []
+        io_env_vars:List[V1EnvVar] = []
         
 
         # Define a volume for input/output for this run. Following v6 convention, this is a volume bind to a
         # sub-folder created for the given run_id (i.e., the content will be shared by all the
         # algorithm instances of the same 'run' within this node).
-        io_volume = client.V1Volume(
-            name=f'task-{run_id}-output',
-            host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'output'))
-        )
-        volumes.append(io_volume)
 
+        # Files or folders will be automatically created as described on https://kubernetes.io/docs/concepts/storage/volumes/#hostpath-volume-types
+
+        # Volume for the output file (this creates an empty file)
+        
+        output_volume = client.V1Volume(
+            name=f'task-{run_id}-output',                    
+            host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'output')),
+            type='FileOrCreate'           
+        )
+        volumes.append(output_volume)
         # Volume mount path for i/o data (/app is the WORKDIR path of v6-node's container)
-        io_volume_mount = client.V1VolumeMount(
+        output_volume_mount = client.V1VolumeMount(
             #standard containers volume mount location
             name=f'task-{run_id}-output',
             mount_path='/app/output'            
         )
 
-        vol_mounts.append(io_volume_mount)
+        vol_mounts.append(output_volume_mount)
+        io_env_vars.append(V1EnvVar(name="OUTPUT_FILE", value='/app/output'))
 
-        """
-         Note: Volume-claims could be used insted of 'host_path' volumes to decouple vantage6 file
-          management from the storage provider (NFS, GCP, etc). However, persitent-volumes (from which 
-          volume-claims are be created), present a risk when used on local file systems. In particular,
-          if two VC are created from the same PV, both would end sharing the same files. 
+        # Volume and volume mount for the INPUT file (this creates an empty file, in which the input parameters user by the algorithm
+        # will be written before starting the task.
 
-          Define the volume for temporal data 
-          tmp_volume = client.V1Volume(
-            name=f'task-{str_run_id}-tmp',
-            persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(claim_name=tmp_vol_name)
-          )
-        """
+        alg_input_volume = client.V1Volume(
+            name=f'task-{run_id}-input',                    
+            host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'input')),
+            type='FileOrCreate'           
+        )
+        volumes.append(alg_input_volume)
+                
+        alg_input_volume_mount = client.V1VolumeMount(
+            #standard containers volume mount location
+            name=f'task-{run_id}-input',
+            mount_path='/app/input'            
+        )
+
+        vol_mounts.append(alg_input_volume_mount)
+        io_env_vars.append(V1EnvVar(name="INPUT_FILE", value='/app/input'))
 
         # Define the volume for temporal data 
         tmp_volume = client.V1Volume(
             name=f'task-{run_id}-tmp',
             host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'tmp')),
+            type='DirectoryOrCreate'
         )
 
         volumes.append(tmp_volume)
@@ -453,14 +483,21 @@ class ContainerManager:
 
         vol_mounts.append(tmp_volume_mount)
 
+        io_env_vars.append(V1EnvVar(name="TEMPORARY_FOLDER", value='/app/tmp'))
+
         # Bind-mount all the CSV files (read only) defined on the configuration file 
+        # TODO bind other input data types
         csv_input_files = list(filter(lambda o: (o['type']=='csv'), self.v6_config['databases']))
+
+        #TODO for the moment only the 'default' (still not sure about the format of this ENV variable)
+        io_env_vars.append(V1EnvVar(name="USER_REQUESTED_DATABASE_LABELS", value='default'))
 
         for csv_input in csv_input_files:
 
             _volume = client.V1Volume(
                 name=f"task-{run_id}-input-{csv_input['label']}",
                 host_path=client.V1HostPathVolumeSource(csv_input['uri']),
+                type="File"
             )
 
             volumes.append(_volume)
@@ -473,7 +510,10 @@ class ContainerManager:
 
             vol_mounts.append(_volume_mount)
 
-        return volumes,vol_mounts
+            io_env_vars.append(V1EnvVar(name=f"{csv_input['label']}_DATABASE_URI", value=f"/app/input/csv/{csv_input['label']}"))
+            io_env_vars.append(V1EnvVar(name=f"{csv_input['label']}_DATABASE_TYPE", value="csv"))
+
+        return volumes,vol_mounts,io_env_vars
     
 
     
