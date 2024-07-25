@@ -524,14 +524,14 @@ class ContainerManager:
             volumes.append(_volume)
 
             _volume_mount = client.V1VolumeMount(            
-                mount_path=f"/app/input/csv/{csv_input['label']}",
+                mount_path=f"/mnt/{csv_input['label']}",
                 name=f"task-{run_id}-input-{csv_input['label']}",
                 read_only=True
             )
 
             vol_mounts.append(_volume_mount)
 
-            io_env_vars.append(client.V1EnvVar(name=f"{csv_input['label'].upper()}_DATABASE_URI", value=f"/app/input/csv/{csv_input['label']}"))
+            io_env_vars.append(client.V1EnvVar(name=f"{csv_input['label'].upper()}_DATABASE_URI", value=f"/mnt/{csv_input['label']}"))
             io_env_vars.append(client.V1EnvVar(name=f"{csv_input['label'].upper()}_DATABASE_TYPE", value="csv"))
 
         return volumes,vol_mounts,io_env_vars
