@@ -533,10 +533,28 @@ class NodePod:
                 next_result = self.k8s_container_manager.get_result()
                 self.log.info(f"""
                     *********************************************************************************  
-                    EVENT @ NODE - task result reported
+                    EVENT @ NODE - task result reported. The following will be notified to the server:
                     {next_result}
                     *********************************************************************************  
                     """)
+                # notify socket channel of algorithm status change
+                self.socketIO.emit(
+                    "algorithm_status_change",
+                    data={
+                        "node_id": self.client.whoami.id_,
+                        "status": next_result.status,
+                        "run_id": next_result.run_id,
+                        "task_id": next_result.task_id,
+                        "collaboration_id": self.client.collaboration_id,
+                        "organization_id": self.client.whoami.organization_id,
+                        "parent_id": next_result.parent_id,
+                    },
+                    namespace="/tasks",
+                )
+
+
+
+                
         except (KeyboardInterrupt, InterruptedError):
             self.log.info("Node is interrupted, shutting down...")
             self.cleanup()
