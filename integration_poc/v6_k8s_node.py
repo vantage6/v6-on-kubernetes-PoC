@@ -9,6 +9,7 @@ from vantage6.node.socket import NodeTaskNamespace
 from vantage6.cli.context.node import NodeContext
 from vantage6.common.task_status import TaskStatus
 from vantage6.node.util import get_parent_id
+from log_manager import logs_setup
 
 from vantage6.node.globals import (
     NODE_PROXY_SERVER_HOSTNAME,
@@ -32,6 +33,7 @@ import json
 import pprint
 import datetime
 import sys
+import threading
 
 # Based on https://github.com/vantage6/vantage6/blob/be2e82b33e68db74304ea01c778094e6b40e671a/vantage6-node/vantage6/node/__init__.py#L1
 
@@ -504,7 +506,44 @@ class NodePod:
     """
 
 
-    def process_tasks_queue(self) -> None:
+    def start_processing_threads(self) -> None:
+        """
+        Start the threads that (1) consumes the queue with the requests produced by the server, and 
+        (2) polls the K8S server for finished jobs, collects their output, and send it to the server;  
+        """
+        self.log.info("Starting threads")
+        results_polling_thread = threading.Thread(target=self.__poll_task_results)
+        queue_processing_thread = threading.Thread(target=self.__process_tasks_queue)
+        results_polling_thread.start()
+        queue_processing_thread.start()
+        
+    
+    def __poll_task_results(self):
+        """
+        Polls the K8S server for finished jobs
+        """
+        
+        #Prevent the K8S rest client from creating DEBUG logging messages (these may lead to unnecesarily
+        # massive log files)
+
+        self.log.info("Starting node's task results polling thread")
+        try:        
+            while True:    
+                time.sleep(1)
+                next_result = self.k8s_container_manager.get_result()
+                self.log.info(f"""
+                    *********************************************************************************  
+                    EVENT @ NODE - task result reported
+                    {next_result}
+                    *********************************************************************************  
+                    """)
+        except (KeyboardInterrupt, InterruptedError):
+            self.log.info("Node is interrupted, shutting down...")
+            self.cleanup()
+            sys.exit()
+
+
+    def __process_tasks_queue(self) -> None:
         # previously called def run_forever(self) -> None:
 
         """
@@ -520,8 +559,7 @@ class NodePod:
             taskresult: misleading name? not the result of a task, but a task description
 
         """
-        
-        
+         
         try:
             while True:
                 self.log.info("********************  Waiting for new tasks....")
@@ -691,10 +729,10 @@ class NodePod:
 
 
 if __name__ == '__main__':
-
+    logs_setup()
     ctx=NodeContext(instance_name='poc_instance', system_folders=False, config_file='configs/node_legacy_config.yaml')
     node = NodePod(ctx)
-    node.process_tasks_queue()
+    node.start_processing_threads()
     print("Success")
     
 
