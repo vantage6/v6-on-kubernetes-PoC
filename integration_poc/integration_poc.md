@@ -78,7 +78,13 @@ The codebase on the `integration_poc` folder is an implementation of a V6 node i
 	pip install -r requirements.txt
 	```
 
-	If you made the server configuration correctly, you should get a launch screen similar to the one of the origial V6-node:
+8. Start the node from the host. Please keep in mind that the node is expected to be launched within a service POD (so that the network policies can be applied to it), so this step will be eventually updated (once this configuration has been properly tested).
+
+	```
+	python v6_k8s_node.py
+	```
+
+	If your server configuration is correct, you should get a launch screen similar to the one of the origial V6-node:
 
 	![alt text](img/k8s-v6-boot.png)
 
