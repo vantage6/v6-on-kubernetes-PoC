@@ -91,7 +91,7 @@ class ContainerManager:
 
             self.log.info(f'>>>> K8S POC - v6 settings:{self.v6_config}')
             self.log.info('>>>> Using microk8s host configuration')  
-            pprint.pp(self.v6_config)          
+            #pprint.pp(self.v6_config)          
         
         #Instanced within a pod
         elif os.path.exists('/app/.kube/config'):
@@ -230,7 +230,8 @@ class ContainerManager:
             self.log.debug(f"run_id={run_id} is discarded")
             return TaskStatus.ACTIVE, None
 
-        str_run_id = str(run_id)
+        str_task_id = str(task_info["id"])
+        str_run_id  = str(run_id)
         
         _io_related_env_variables: List[V1EnvVar]
 
@@ -257,12 +258,18 @@ class ContainerManager:
                             env=env_vars
                         )
 
+        job_metadata = client.V1ObjectMeta(
+            name=str_run_id,
+            annotations={"run_id": str_run_id, 
+                         "task_id": str_task_id
+                        },
+        )
 
         # Define the job
         job = client.V1Job(
             api_version="batch/v1",
             kind="Job",
-            metadata=client.V1ObjectMeta(name=str_run_id),
+            metadata=job_metadata,
             spec=client.V1JobSpec(
                 template=client.V1PodTemplateSpec(
                     metadata=client.V1ObjectMeta(labels={"app": str_run_id}),
@@ -276,8 +283,7 @@ class ContainerManager:
             ),
         )
 
-        # Set ttlSecondsAfterFinished directly on the V1JobSpec object
-        job.spec.ttlSecondsAfterFinished = 600  # Retain the Job for 10 minutes after finishing
+        self.log.info(f"Creating namedspaced K8S job for task_id={str_task_id} and run_id={str_run_id}.")
 
         self.batch_api.create_namespaced_job(namespace="v6-jobs", body=job)
 
@@ -364,8 +370,7 @@ class ContainerManager:
         Create the files required by the algorithms, which will be bound to the PODs through a volume mount:
         'docker_input' as the 'input' file, and 'token' 
         """
-
-        print(f"Creating {alg_input_file_path} and {token_file_path}")
+        self.log.info(f"Creating {alg_input_file_path} and {token_file_path}")
 
         # Check if the files already exist
         #if Path(alg_input_file_path).exists() or Path(token_file_path).exists():
@@ -734,10 +739,12 @@ class ContainerManager:
                         self.batch_api.delete_namespaced_job(name=job_id, namespace="v6-jobs")
                         self.__delete_job_related_pods(job_id=job_id,namespace="v6-jobs")
 
-                        #TODO run_id/task_id are not necesarily the same
+
+                        self.log.info(f"Sending results of run_id={job.metadata.annotations['run_id']} and task_id={job.metadata.annotations['task_id']} back to the server")
+                        #TODO include parent_id 
                         result = Result(
-                                run_id=job_id,
-                                task_id=job_id,
+                                run_id=job.metadata.annotations["run_id"],
+                                task_id=job.metadata.annotations["task_id"],
                                 logs=pod_tty_output,  
                                 data=results,   
                                 status=TaskStatus.COMPLETED,
@@ -758,10 +765,10 @@ class ContainerManager:
                         self.log.info(f"Cleaning up container & job POD {job.metadata.name} / {job_id}")
                         self.batch_api.delete_namespaced_job(name=job_id, namespace="v6-jobs")
                         self.__delete_job_related_pods(job_id=job_id,namespace="v6-jobs")
-
+                        self.log.info(f"Sending failure details of run_id={job.metadata.annotations['run_id']} and task_id={job.metadata.annotations['task_id']} back to the server")
                         result = Result(
-                                run_id=-1,
-                                task_id=job_id,
+                                run_id=job.metadata.annotations["run_id"],
+                                task_id=job.metadata.annotations["task_id"],
                                 logs=pod_tty_output,  
                                 data=b"",   
                                 status=TaskStatus.CRASHED,
