@@ -46,5 +46,5 @@ This is an implementation of a simplified version of the vantage6 client/server 
 
 An implementation of a V6 node intended to work as a regular (Docker-based) V6 node, but working with a K8S cluster under the hood. It is based and built on top of the experiments made with the architecture proof of concept.
 
-[Integration proof of concept](integration_poc/integration_poc.md)
+[Integration proof of concept guidelines](integration_poc/integration_poc.md)
 
