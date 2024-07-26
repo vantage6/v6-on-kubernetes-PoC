@@ -1,8 +1,8 @@
 # API key used to authenticate at the server.
-api_key: 28c4079a-528e-43a7-882d-a01d9fe57494
+api_key: 
 
 # URL of the vantage6 server
-server_url: https://v6-server.tail984a0.ts.net
+server_url: 
 
 # port the server listens to
 port: 443

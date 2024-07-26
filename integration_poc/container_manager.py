@@ -734,8 +734,9 @@ class ContainerManager:
                         self.batch_api.delete_namespaced_job(name=job_id, namespace="v6-jobs")
                         self.__delete_job_related_pods(job_id=job_id,namespace="v6-jobs")
 
+                        #TODO run_id/task_id are not necesarily the same
                         result = Result(
-                                run_id=-1,
+                                run_id=job_id,
                                 task_id=job_id,
                                 logs=pod_tty_output,  
                                 data=results,   
