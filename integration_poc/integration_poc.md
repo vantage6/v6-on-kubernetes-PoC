@@ -16,16 +16,19 @@ The codebase on the `integration_poc` folder is an implementation of a V6 node i
 - [x] Authentication against the server, Socket.io connection
 - [x] Creating I/O and token files, binding them to the POD, setting the ENV variables required by the algorithm
 - [x] Launching a V6-algorithm (tested through the kubernetes dashboard)
-- [X] Listen for task finalization (implemented onthe PoC, adaptation is required), reporting the results back to the server.
+- [X] Listen for task finalization (implemented onthe PoC, adaptation is required)
+- [ ] Reporting the results back to the server properly
+- [ ] Encrypted data exchange
 - [ ] Launch the (actual) node proxy as a POD, apply the networking policies as it was done on the PoC
 - [ ] Enabling the proxy for the algorithms to reach the server.
 - [ ] Handling multiple K8S status (see reported issues)
 - [ ] + Other features yet to be explored through the architectural proof of concept
 
 
+
 ## Setup (using microk8s) 
 
-1. Setup a vantage6 server, create an organization for the K8S-V6-node, and a collaboration that includes it. Copy the JSON Web Token, as it will be used later.
+1. Setup a vantage6 server (use version 4.5.5), create an organization for the K8S-V6-node, and a collaboration that includes it. Copy the JSON Web Token, as it will be used later.
 
 2. Setup microk8s on [Linux](https://ubuntu.com/tutorials/install-a-local-kubernetes-with-microk8s#1-overview). It can be installed on [Windows](https://microk8s.io/docs/install-windows), but this PoC has been tested only on Ubuntu environments.
 

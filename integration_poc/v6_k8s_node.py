@@ -553,7 +553,6 @@ class NodePod:
                 )
 
 
-
                 
         except (KeyboardInterrupt, InterruptedError):
             self.log.info("Node is interrupted, shutting down...")
@@ -654,6 +653,7 @@ class NodePod:
     
         """
 
+
     def __start_task(self, task_incl_run: dict) -> None:
         """
         Start the docker image and notify the server that the task has been
@@ -677,6 +677,7 @@ class NodePod:
         #vol_name = self.ctx.docker_temporary_volume_name(task["job_id"])
         #self.__docker.create_volume(vol_name)
 
+        # (message from the original source code) 
         # For some reason, if the key 'input' consists of JSON, it is
         # automatically marshalled? This causes trouble, so we'll serialize it
         # again.
