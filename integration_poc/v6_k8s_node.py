@@ -565,8 +565,7 @@ class NodePod:
                     id_=next_result.run_id,
                     data={
                         "result": next_result.data,
-                        "log": "no_logs",
-                        #"log": next_result.logs,
+                        "log":next_result.logs[0],
                         "status": next_result.status,
                         "finished_at": datetime.datetime.now().isoformat(),
                     },
