@@ -537,7 +537,8 @@ class NodePod:
                     {next_result}
                     *********************************************************************************  
                     """)
-                # notify socket channel of algorithm status change
+                
+                # notify other nodes about algorithm status change
                 self.socketIO.emit(
                     "algorithm_status_change",
                     data={
@@ -550,6 +551,25 @@ class NodePod:
                         "parent_id": next_result.parent_id,
                     },
                     namespace="/tasks",
+                )
+
+
+                #Notify other nodes about algorithm status change
+                self.log.info(f"Sending result (run={next_result.run_id}) to the server!")
+
+                response = self.client.request(f"task/{next_result.task_id}")
+
+                init_org = response.get("init_org")            
+
+                self.client.run.patch(
+                    id_=next_result.run_id,
+                    data={
+                        "result": next_result.data,
+                        "log":next_result.logs[0],
+                        "status": next_result.status,
+                        "finished_at": datetime.datetime.now().isoformat(),
+                    },
+                    init_org_id=init_org.get("id"),
                 )
 
 
