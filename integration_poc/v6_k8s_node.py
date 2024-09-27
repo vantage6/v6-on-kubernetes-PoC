@@ -10,6 +10,7 @@ from vantage6.cli.context.node import NodeContext
 from vantage6.common.task_status import TaskStatus
 from vantage6.node.util import get_parent_id
 from log_manager import logs_setup
+from csv_utils import get_csv_column_names
 
 from vantage6.node.globals import (
     NODE_PROXY_SERVER_HOSTNAME,
@@ -443,14 +444,11 @@ class NodePod:
             type_ = db.get("type")
             labels.append(label)
             types[f"db_type_{label}"] = type_
-            if type_ in ("csv", "parquet"):
-                """
-                TODO get the actual column names from the data files
-                col_names[f"columns_{label}"] = self.__docker.get_column_names(
-                    label, type_
-                )                
-                """
-                col_names[f"columns_{label}"] = ["Name","Age","Location"]
+
+            if type_ in ("csv"):
+                csv_path = db.get("uri")
+                col_names[f"columns_{label}"] = get_csv_column_names(csv_path)
+
         config_to_share["database_labels"] = labels
         config_to_share["database_types"] = types
         if col_names:
