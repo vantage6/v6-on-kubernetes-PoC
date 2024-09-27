@@ -5,6 +5,7 @@ from vantage6.common.task_status import TaskStatus
 from typing import Tuple, List
 from vantage6.common.task_status import TaskStatus, has_task_failed
 from vantage6.common import logger_name
+from vantage6.node.util import get_parent_id
 from typing import NamedTuple
 from enum import Enum
 from pathlib import Path
@@ -232,6 +233,7 @@ class ContainerManager:
 
         str_task_id = str(task_info["id"])
         str_run_id  = str(run_id)
+        parent_id = get_parent_id(task_info)
         
         _io_related_env_variables: List[V1EnvVar]
 
@@ -261,7 +263,8 @@ class ContainerManager:
         job_metadata = client.V1ObjectMeta(
             name=str_run_id,
             annotations={"run_id": str_run_id, 
-                         "task_id": str_task_id
+                         "task_id": str_task_id,
+                         "task_parent_id": parent_id
                         },
         )
 
@@ -741,14 +744,14 @@ class ContainerManager:
 
 
                         self.log.info(f"Sending results of run_id={job.metadata.annotations['run_id']} and task_id={job.metadata.annotations['task_id']} back to the server")
-                        #TODO include parent_id 
+                        
                         result = Result(
                                 run_id=job.metadata.annotations["run_id"],
                                 task_id=job.metadata.annotations["task_id"],
                                 logs=pod_tty_output,  
                                 data=results,   
                                 status=TaskStatus.COMPLETED,
-                                parent_id=-1 #get_parent_id(task_dict: dict) will be used
+                                parent_id=job.metadata.annotations["task_parent_id"],
                             )
                         completed_job = True    
                     
@@ -772,7 +775,7 @@ class ContainerManager:
                                 logs=pod_tty_output,  
                                 data=b"",   
                                 status=TaskStatus.CRASHED,
-                                parent_id=-1 #get_parent_id(task_dict: dict) will be used
+                                parent_id=job.metadata.annotations["task_parent_id"],
                             )    
                         completed_job = True
                     
