@@ -5,7 +5,7 @@ FROM python:3.11
 WORKDIR /app
 
 # Copy the Python script into the container
-COPY *.py reqs.txt /app/
+COPY *.py requirements.txt /app/
 
 # Copy the 'vantage6' folder (the original v6 classes used by the PoC)  into the container
 COPY vantage6 /app/vantage6

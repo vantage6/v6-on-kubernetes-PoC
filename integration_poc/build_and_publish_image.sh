@@ -4,4 +4,4 @@ docker buildx create --name mybuilder
 docker buildx use mybuilder
 docker buildx inspect --bootstrap
 
-docker buildx build --platform linux/arm64,linux/amd64 -t hectorcadavid/v6_k8s_node:latest --push .
+docker buildx build --platform linux/arm64,linux/amd64 -t hcadavidescience/v6_k8s_node:latest --push .

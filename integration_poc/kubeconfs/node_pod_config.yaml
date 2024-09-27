@@ -13,12 +13,12 @@ metadata:
 apiVersion: v1
 kind: Pod
 metadata:
- name: poc-node-pod
+ name: v6-node-pod
  namespace: v6-node
 spec:
  containers:
- - name: dummy-node-server
-   image: docker.io/hectorcadavid/dummy_v6_node:latest
+ - name: v6-node-server
+   image: docker.io/hcadavidescience/v6_k8s_node:latest
    tty: true
    env:
    - name: HOST_IP
@@ -27,7 +27,7 @@ spec:
          fieldPath: status.hostIP
    - name: PORT
      value: "5000"
-   command: ["python", "node.py"]
+   command: ["python", "v6_k8s_node.py"]
    volumeMounts:
    - name: task-files-root
      mountPath: /app/tasks
