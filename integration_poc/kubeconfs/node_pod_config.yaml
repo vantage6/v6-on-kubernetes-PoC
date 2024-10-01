@@ -16,6 +16,10 @@ metadata:
  name: v6-node-pod
  namespace: v6-node
 spec:
+ hostAliases:
+ - ip: "10.2.67.147"
+   hostnames:
+   - "v6-server.tail984a0.ts.net"
  containers:
  - name: v6-node-server
    image: docker.io/hcadavidescience/v6_k8s_node:latest
