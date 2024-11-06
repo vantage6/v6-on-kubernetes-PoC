@@ -10,6 +10,7 @@ from vantage6.cli.context.node import NodeContext
 from vantage6.common.task_status import TaskStatus
 from vantage6.node.util import get_parent_id
 from log_manager import logs_setup
+from csv_utils import get_csv_column_names
 
 from vantage6.node.globals import (
     NODE_PROXY_SERVER_HOSTNAME,
@@ -44,7 +45,7 @@ class NodePod:
         self.ctx = ctx
 
         # Added for the PoC
-        self.k8s_container_manager = ContainerManager()
+        self.k8s_container_manager = ContainerManager(ctx)
 
         # Initialize the node. If it crashes, shut down the parts that started
         # already
@@ -443,14 +444,11 @@ class NodePod:
             type_ = db.get("type")
             labels.append(label)
             types[f"db_type_{label}"] = type_
-            if type_ in ("csv", "parquet"):
-                """
-                TODO get the actual column names from the data files
-                col_names[f"columns_{label}"] = self.__docker.get_column_names(
-                    label, type_
-                )                
-                """
-                col_names[f"columns_{label}"] = ["Name","Age","Location"]
+
+            if type_ in ("csv"):
+                csv_path = db.get("uri")
+                col_names[f"columns_{label}"] = get_csv_column_names(csv_path)
+
         config_to_share["database_labels"] = labels
         config_to_share["database_types"] = types
         if col_names:
@@ -769,7 +767,20 @@ class NodePod:
 
 if __name__ == '__main__':
     logs_setup()
-    ctx=NodeContext(instance_name='poc_instance', system_folders=False, config_file='configs/node_legacy_config.yaml')
+
+    # Config file path - exists when the node is running within a POD (see kubeconfs/node_pod_config.yaml)
+    containeridzed_node_config_absolute_path = "/app/.v6node/configs/node_legacy_config.yaml"
+    # Regular (non-containerized node) configuration file path
+    node_config_relative_path = "configs/node_legacy_config.yaml"
+
+    if os.path.exists(containeridzed_node_config_absolute_path):
+        print("Starting the node from within a Kubernetes POD")
+        ctx=NodeContext(instance_name='poc_instance', system_folders=False, config_file=containeridzed_node_config_absolute_path)
+    else:
+        print("Attempting to start the node from a regular host")
+        node_config_absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), node_config_relative_path)
+        ctx=NodeContext(instance_name='poc_instance', system_folders=False, config_file=node_config_absolute_path)
+    
     node = NodePod(ctx)
     node.start_processing_threads()
     print("Success")

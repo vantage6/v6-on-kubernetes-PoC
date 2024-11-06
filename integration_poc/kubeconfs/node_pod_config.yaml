@@ -13,12 +13,16 @@ metadata:
 apiVersion: v1
 kind: Pod
 metadata:
- name: poc-node-pod
+ name: v6-node-pod
  namespace: v6-node
 spec:
+ hostAliases:
+ - ip: "10.2.67.147"
+   hostnames:
+   - "v6-server.tail984a0.ts.net"
  containers:
- - name: dummy-node-server
-   image: docker.io/hectorcadavid/dummy_v6_node:latest
+ - name: v6-node-server
+   image: docker.io/hcadavidescience/v6_k8s_node:latest
    tty: true
    env:
    - name: HOST_IP
@@ -27,14 +31,14 @@ spec:
          fieldPath: status.hostIP
    - name: PORT
      value: "5000"
-   command: ["python", "node.py"]
+   command: ["python", "v6_k8s_node.py"]
    volumeMounts:
    - name: task-files-root
      mountPath: /app/tasks
    - name: kube-config-file
      mountPath: /app/.kube/config  
    - name: v6-node-config-file
-     mountPath: /app/.v6node/node_config.yaml
+     mountPath: /app/.v6node/configs/node_legacy_config.yaml
 
  volumes:
  - name: task-files-root
@@ -45,5 +49,5 @@ spec:
      path: /home/hcadavid/.kube/config   
  - name: v6-node-config-file
    hostPath:
-     path: /home/hcadavid/k8s/v6-on-kubernetes-PoC/node_poc/node_config.yaml
+     path: /home/hcadavid/k8s/v6-on-kubernetes-PoC/integration_poc/configs/node_legacy_config.yaml
 

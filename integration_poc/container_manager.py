@@ -2,6 +2,7 @@ from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.client import V1EnvVar
 from vantage6.common.task_status import TaskStatus
+from vantage6.cli.context.node import NodeContext
 from typing import Tuple, List
 from vantage6.common.task_status import TaskStatus, has_task_failed
 from vantage6.common import logger_name
@@ -9,6 +10,7 @@ from vantage6.node.util import get_parent_id
 from typing import NamedTuple
 from enum import Enum
 from pathlib import Path
+
 
 import re
 import os
@@ -67,14 +69,20 @@ class KilledRun(NamedTuple):
 class ContainerManager:
 
 
-    def __init__(self):
-
+    def __init__(self, ctx: NodeContext):
+        
         self.log = logging.getLogger(logger_name(__name__))
 
         #v6-node configuration entries
         self.v6_config: dict
                 
         self.running_on_guest_env: bool
+
+        #Load v6-node configuration file
+        with open(ctx.config_file, 'r') as file:
+            self.v6_config = yaml.safe_load(file)
+
+        self.log.info(f'v6-K8S Node - loaded v6 settings:{self.v6_config}')
 
         #minik8s config
         home_dir = os.path.expanduser('~')
@@ -85,13 +93,8 @@ class ContainerManager:
 
             self.running_on_guest_env = False
             #default microk8s config
-            config.load_kube_config(kube_config_file_path)
-
-            with open('configs/node_legacy_config.yaml', 'r') as file:
-                self.v6_config = yaml.safe_load(file)
-
-            self.log.info(f'>>>> K8S POC - v6 settings:{self.v6_config}')
-            self.log.info('>>>> Using microk8s host configuration')  
+            config.load_kube_config(kube_config_file_path)            
+            self.log.info('>>> Loading K8S configuration file from the host filesystem (Node running on a regular host)')
             #pprint.pp(self.v6_config)          
         
         #Instanced within a pod
@@ -100,10 +103,7 @@ class ContainerManager:
             self.running_on_guest_env = True
             #Default mount location defined on POD configuration                
             config.load_kube_config('/app/.kube/config')            
-            with open('/app/.v6node/node_config.yaml', 'r') as file:
-                self.v6_config = yaml.safe_load(file)
-            self.log.info(f'v6 settings:{self.v6_config}')
-            self.log.info('Microk8s using configuration file bind to a POD')            
+            self.log.info('>>> Loading K8S configuration file from a hostPath volume (Node running within a POD)')
         
         # before a task is executed it gets exposed to these policies
         self._policies = self._setup_policies(config)
