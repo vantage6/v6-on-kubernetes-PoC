@@ -45,7 +45,7 @@ class NodePod:
         self.ctx = ctx
 
         # Added for the PoC
-        self.k8s_container_manager = ContainerManager()
+        self.k8s_container_manager = ContainerManager(ctx)
 
         # Initialize the node. If it crashes, shut down the parts that started
         # already
