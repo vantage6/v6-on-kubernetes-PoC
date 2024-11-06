@@ -38,7 +38,7 @@ spec:
    - name: kube-config-file
      mountPath: /app/.kube/config  
    - name: v6-node-config-file
-     mountPath: /app/.v6node/node_config.yaml
+     mountPath: /app/.v6node/configs/node_legacy_config.yaml
 
  volumes:
  - name: task-files-root
@@ -49,5 +49,5 @@ spec:
      path: /home/hcadavid/.kube/config   
  - name: v6-node-config-file
    hostPath:
-     path: /home/hcadavid/k8s/v6-on-kubernetes-PoC/node_poc/node_config.yaml
+     path: /home/hcadavid/k8s/v6-on-kubernetes-PoC/integration_poc/configs/node_legacy_config.yaml
 

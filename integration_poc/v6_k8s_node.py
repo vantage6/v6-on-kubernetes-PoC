@@ -767,7 +767,20 @@ class NodePod:
 
 if __name__ == '__main__':
     logs_setup()
-    ctx=NodeContext(instance_name='poc_instance', system_folders=False, config_file='configs/node_legacy_config.yaml')
+
+    # Config file path - exists when the node is running within a POD (see kubeconfs/node_pod_config.yaml)
+    containeridzed_node_config_absolute_path = "/app/.v6node/configs/node_legacy_config.yaml"
+    # Regular (non-containerized node) configuration file path
+    node_config_relative_path = "configs/node_legacy_config.yaml"
+
+    if os.path.exists(containeridzed_node_config_absolute_path):
+        print("Starting the node from within a Kubernetes POD")
+        ctx=NodeContext(instance_name='poc_instance', system_folders=False, config_file=containeridzed_node_config_absolute_path)
+    else:
+        print("Attempting to start the node from a regular host")
+        node_config_absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), node_config_relative_path)
+        ctx=NodeContext(instance_name='poc_instance', system_folders=False, config_file=node_config_absolute_path)
+    
     node = NodePod(ctx)
     node.start_processing_threads()
     print("Success")
