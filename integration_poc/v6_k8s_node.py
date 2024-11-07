@@ -447,8 +447,15 @@ class NodePod:
 
             if type_ in ("csv"):
                 csv_path = db.get("uri")
-                col_names[f"columns_{label}"] = get_csv_column_names(csv_path)
-
+                #If the node is running within a host, use the uri, as 
+                #defined in the config file.
+                #if the node is running within a POD, by convention 
+                # (see kubeconfs/node_pod_config.yaml), the uri is the
+                # same with the prefix: /app/.databases/
+                if self.k8s_container_manager.running_on_guest_env:                    
+                    col_names[f"columns_{label}"] = get_csv_column_names(os.path.join("/app/.databases/", csv_path))
+                else:
+                    col_names[f"columns_{label}"] = get_csv_column_names(csv_path)
         config_to_share["database_labels"] = labels
         config_to_share["database_types"] = types
         if col_names:
