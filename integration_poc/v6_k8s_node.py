@@ -453,7 +453,7 @@ class NodePod:
                 # (see kubeconfs/node_pod_config.yaml), the uri is the
                 # same with the prefix: /app/.databases/
                 if self.k8s_container_manager.running_on_guest_env:                    
-                    col_names[f"columns_{label}"] = get_csv_column_names(os.path.join("/app/.databases/", csv_path))
+                    col_names[f"columns_{label}"] = get_csv_column_names(os.path.join("/app/.databases/", csv_path.lstrip('/')))
                 else:
                     col_names[f"columns_{label}"] = get_csv_column_names(csv_path)
         config_to_share["database_labels"] = labels
