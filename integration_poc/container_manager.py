@@ -426,14 +426,13 @@ class ContainerManager:
         vol_mounts:List[client.V1VolumeMount] = []
         io_env_vars:List[V1EnvVar] = []
         
-        # Paths must correspond to a volumeMount, not tp the host file system, as
-        # the node will be running within a POD
-        # self.v6_config['task_dir'] is a path within the host
+        # This method creates the folders required for the required tasks (subfolders
+        # of the 'tasks-dir' defined in the v6 node configuration file), and then
+        # bind these as host-volume mounts. The folder is created from the context
+        # of the running node, so the target folder dependes on whether the node
+        # is running from the host or from a POD.
 
-        # If running withn a POD, use the container path defined by convention.
-        # @Precondition:
-        #       This standard path must be mapped to the value defined by the v6-config 
-        #       when launching the Node from within the POD (see kubeconfs/node_pod_config.yaml)
+        # If running whithin the POD, use the tas
         if (self.running_on_guest_env):        
             task_base_path = node_constants.TASK_FILES_ROOT
         # If running withn the host, use the value defined by the v6-config file
@@ -443,8 +442,8 @@ class ContainerManager:
         _input_file_path = os.path.join(task_base_path,run_id,'input')
         _token_file_path = os.path.join(task_base_path,run_id,'token')
         _output_file_path = os.path.join(task_base_path,run_id,'output')
-
-        #Create algorithm's input and token files before creating volume mounts with them.
+        
+        #Create algorithm's input and token files before creating volume mounts with them (relative to the node's file system: POD or host)
         self._create_io_files(
             alg_input_file_path=_input_file_path,
             docker_input=docker_input,
@@ -453,18 +452,27 @@ class ContainerManager:
             output_file_path=_output_file_path
         )
 
+
+        # Binding the required files and folders to the Job POD as HostPathVolume (using actual host path folder 
+        # as this is made by the K8S server).
+
+        host_task_base_path = self.v6_config['task_dir']
+
+        _host_input_file_path = os.path.join(host_task_base_path,run_id,'input')
+        _host_token_file_path = os.path.join(host_task_base_path,run_id,'token')
+        _host_output_file_path = os.path.join(host_task_base_path,run_id,'output')
+        _host_tmp_folder_path = os.path.join(host_task_base_path,run_id,'tmp')
+
         # Define a volume for input/output for this run. Following v6 convention, this is a volume bind to a
         # sub-folder created for the given run_id (i.e., the content will be shared by all the
         # algorithm instances of the same 'run' within this node).
 
         # Files or folders will be automatically created as described on https://kubernetes.io/docs/concepts/storage/volumes/#hostpath-volume-types
 
-
-        ##### Volume for the output file (this creates an empty file)
-        
+        ##### Volume for the output file (this creates an empty file)        
         output_volume = client.V1Volume(
             name=f'task-{run_id}-output',                    
-            host_path=client.V1HostPathVolumeSource(path=_output_file_path),
+            host_path=client.V1HostPathVolumeSource(path=_host_output_file_path),
         )
         volumes.append(output_volume)
         # Volume mount path for i/o data (/app is the WORKDIR path of v6-node's container)
@@ -482,7 +490,7 @@ class ContainerManager:
 
         alg_input_volume = client.V1Volume(
             name=f'task-{run_id}-input',                    
-            host_path=client.V1HostPathVolumeSource(path=_input_file_path),
+            host_path=client.V1HostPathVolumeSource(path=_host_input_file_path),
         )
         volumes.append(alg_input_volume)
                 
@@ -501,7 +509,7 @@ class ContainerManager:
 
         token_volume = client.V1Volume(
             name=f'token-{run_id}-input',                    
-            host_path=client.V1HostPathVolumeSource(path=_token_file_path),
+            host_path=client.V1HostPathVolumeSource(path=_host_token_file_path),
         )
         volumes.append(token_volume)
                 
@@ -518,7 +526,7 @@ class ContainerManager:
         ######## Volume for temporal data folder        
         tmp_volume = client.V1Volume(
             name=f'task-{run_id}-tmp',
-            host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'tmp')),
+            host_path=client.V1HostPathVolumeSource(path=_host_tmp_folder_path),
         )
 
         volumes.append(tmp_volume)
