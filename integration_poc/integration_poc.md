@@ -16,19 +16,18 @@ The codebase on the `integration_poc` folder is an implementation of a V6 node i
 - [x] Authentication against the server, Socket.io connection
 - [x] Creating I/O and token files, binding them to the POD, setting the ENV variables required by the algorithm
 - [x] Launching a V6-algorithm (tested through the kubernetes dashboard)
-- [X] Listen for task finalization (implemented onthe PoC, adaptation is required)
-- [ ] Reporting the results back to the server properly
+- [X] Listening for task finalization (implemented onthe PoC, adaptation is required)
+- [X] Launching the node and the proxy as a POD
+- [X] Reporting the results back to the server properly 
+- [ ] Applying the networking policies as it was done on the PoC, enabling the proxy for the algorithms to reach the server.
 - [ ] Encrypted data exchange
-- [ ] Launch the (actual) node proxy as a POD, apply the networking policies as it was done on the PoC
-- [ ] Enabling the proxy for the algorithms to reach the server.
 - [ ] Handling multiple K8S status (see reported issues)
 - [ ] + Other features yet to be explored through the architectural proof of concept
 
 
+## Launching the node and linking it to a V6 server (using microk8s) 
 
-## Setup (using microk8s) 
-
-1. Setup a vantage6 server (use version 4.5.5), create an organization for the K8S-V6-node, and a collaboration that includes it. Copy the JSON Web Token, as it will be used later.
+1. Setup a vantage6 server (tested with version 4.7.0), create an organization for the K8S-V6-node, and a collaboration that includes it. Copy the JSON Web Token, as it will be used later.
 
 2. Setup microk8s on [Linux](https://ubuntu.com/tutorials/install-a-local-kubernetes-with-microk8s#1-overview). It can be installed on [Windows](https://microk8s.io/docs/install-windows), but this PoC has been tested only on Ubuntu environments.
 
@@ -36,7 +35,9 @@ The codebase on the `integration_poc` folder is an implementation of a V6 node i
 
 4. Clone the repository. Work on the `integration_poc` folder.
 
-5. Edit the v6-node configuration file (integration_poc/configs/node_legacy_config.yaml), and update the path of the csv included in the repository, as the 'default' database.
+5. Build the docker image and publish it on a Docker registry. You can edit and use the script `build_and_publish.sh` to build an image compatible with both ARM and x86 architectures.
+
+6. Edit the v6-node configuration file (integration_poc/configs/node_legacy_config.yaml), and update the path of the csv included in the repository (or any other CVS you want to use), as the 'default' database.
 
 	```
 	databases:
@@ -45,7 +46,7 @@ The codebase on the `integration_poc` folder is an implementation of a V6 node i
 	    type: csv
 	```
 
-6. In the configuration file, add the connection settings of your V6 server:
+7. In the configuration file, add the connection settings of your V6 server:
 
 	```
 	# API key used to authenticate at the server.
@@ -62,36 +63,82 @@ The codebase on the `integration_poc` folder is an implementation of a V6 node i
 
 	```
 
-
-6. In the onfiguration file, set the 'task_dir' setting (directory where local task files are stored). Just add the path of an empty folder (Kubernetes will take care of creating the subfolders when needed!)
+8. In the onfiguration file, set the 'task_dir' setting (directory where local task files are stored). 
 
 	```
 	task_dir: /<ouput_path>/tasks
 	```
 
+9. Create the tasks folder on tha path previously configured. If you don't do this, Kubernets will create it with root as the owner, which will cause problems as the JOB PODs don't have root privileges for creating sub-folders on it.
 
-7. Open a terminal on the `integration_poc` folder and create a Python virtual environment, with the needed dependencies:
+10. Edit the Kubernetes YAML configuration file used for launching the Node as a POD:
+
+	- Add the reference to the image (e.g., in Dockerhub) created in Step #5.
+
+	```YAML
+	containers:
+	- name: v6-node-server
+	image: DOCKER_IMAGE_GENERATED_IN_PREVIOUS_STEPS
+	tty: true
+	env:
+	```
+
+	- Add the full URI of the default database defined in step #6. In the `mountPath`, include the prefix `/app/.databases/`, and on the `hostPath`add the URI as-is:
+
+	```YAML
+    - name: v6-node-default-database
+      mountPath: /app/.databases/{ABSOLUTE_HOST_PATH_OF_DEFAULT_DATABASE}
+
+	...
+
+	- name: v6-node-default-database
+	  hostPath:
+	    path: ABSOLUTE_HOST_PATH_OF_DEFAULT_DATABASE
 
 	```
-	python -m venv venv
-	source venv/bin/activate
-	pip install -r requirements.txt
+
+	- Add the abosolute path of the task folder, as defined in the v6-node configuration file (step #8).
+	```YAML
+	volumes:
+	- name: task-files-root
+	  hostPath:
+	    path: ABSOLUTE_HOST_PATH_OF_THE_TASK_FOLDER
 	```
 
-8. Start the node from the host. Please keep in mind that the node is expected to be launched within a service POD (so that the network policies can be applied to it), so this step will be eventually updated (once this configuration has been properly tested).
+	- Add the absolute path of the kubernetes configuration file. This integration PoC has been tested with Ubuntu server 22.04 and MicroK8S, where such configuration file is by default on `/home/<user_name>/.kube/config`.
+
+	```YAML
+	- name: kube-config-file
+	  hostPath:
+	    path: ABSOLUTE_HOST_PATH_OF_THE_KUBE_CONFIG_FOLDER
+	```
+
+	- Add the absolute path of the vantage6 configuration file (the one edited on Step #6):	
+	```YAML
+	- name: v6-node-config-file
+	  hostPath:
+	    path: ABSOLUTE_HOST_PATH_OF_THE_VANTAGE6_NODE_CONFIG_FILE
+
+    ```
+
+11. Launch the Node with the `kubectl` command:
 
 	```
-	python v6_k8s_node.py
+	bash:~/$ kubectl apply -f kubeconfs/node_pod_config.yaml
+
 	```
 
-	If your server configuration is correct, you should get a launch screen similar to the one of the origial V6-node:
+12. Open the Kubernetes dashboard, select the 'v6-node' namespace, and check that the `v6-node-pod` POD is now running.
 
-	![alt text](img/k8s-v6-boot.png)
+![alt text](img/pods-list.png)
 
 
-9. Open the Kubernetes dashboard (select the 'v6-jobs' namespace) to explore what is happening under the hood in the following steps.
+13. Open tbe `v6-node-pod` logs on the dashboard and check that the node startup sequence is completed with no problems.
 
-10. Request the execution of the **partial** part of a V6 algorithm. A 'central' function wouldn't work yet as the networking for the communication between algorithms and the proxy is yet to be done. You can do this using the web-based user interface, or the python client. On the node logs you will see how after this execution request is received, a new Job POD is created:
+![alt text](img/node-pod-logs.png)
+
+
+14. Request the execution of the **partial** part of a V6 algorithm on the vantage6 server (the networking settings between the algorithms and the node-proxy is still in progress). You can do this using the web-based user interface, or the python client. Reload the logs from Step #13 to verify how after this execution request is received, a new Job POD is created:
 
 	![alt text](img/request_n_result_log.png)
 
@@ -108,3 +155,6 @@ The codebase on the `integration_poc` folder is an implementation of a V6 node i
 	The POD view provide further details on the container's mounted volumes and environment variables.
 
 	![alt text](img/pod_details.png)
+
+
+
