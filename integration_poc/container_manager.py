@@ -11,7 +11,8 @@ from typing import NamedTuple
 from enum import Enum
 from pathlib import Path
 
-
+import pod_node_constants
+import pod_job_constants
 import re
 import os
 import yaml
@@ -84,7 +85,7 @@ class ContainerManager:
 
         self.log.info(f'v6-K8S Node - loaded v6 settings:{self.v6_config}')
 
-        #minik8s config
+        #minik8s config, by default in the user's home directory root
         home_dir = os.path.expanduser('~')
         kube_config_file_path = os.path.join(home_dir, '.kube', 'config')
 
@@ -98,11 +99,11 @@ class ContainerManager:
             #pprint.pp(self.v6_config)          
         
         #Instanced within a pod
-        elif os.path.exists('/app/.kube/config'):
+        elif os.path.exists(pod_node_constants.KUBE_CONFIG_FILE_PATH):
 
             self.running_on_guest_env = True
             #Default mount location defined on POD configuration                
-            config.load_kube_config('/app/.kube/config')            
+            config.load_kube_config(pod_node_constants.KUBE_CONFIG_FILE_PATH)            
             self.log.info('>>> Loading K8S configuration file from a hostPath volume (Node running within a POD)')
         
         # before a task is executed it gets exposed to these policies
@@ -425,11 +426,24 @@ class ContainerManager:
         vol_mounts:List[client.V1VolumeMount] = []
         io_env_vars:List[V1EnvVar] = []
         
-        _input_file_path = os.path.join(self.v6_config['task_dir'],run_id,'input')
-        _token_file_path = os.path.join(self.v6_config['task_dir'],run_id,'token')
-        _output_file_path = os.path.join(self.v6_config['task_dir'],run_id,'output')
+        # This method creates the folders required for the required tasks (subfolders
+        # of the 'tasks-dir' defined in the v6 node configuration file), and then
+        # bind these as host-volume mounts. The folder is created from the context
+        # of the running node, so the target folder dependes on whether the node
+        # is running from the host or from a POD.
 
-        #Create algorithm's input and token files before creating volume mounts with them.
+        # If running whithin the POD, use the tas
+        if (self.running_on_guest_env):        
+            task_base_path = pod_node_constants.TASK_FILES_ROOT
+        # If running withn the host, use the value defined by the v6-config file
+        else:            
+            task_base_path = self.v6_config['task_dir']
+
+        _input_file_path = os.path.join(task_base_path,run_id,'input')
+        _token_file_path = os.path.join(task_base_path,run_id,'token')
+        _output_file_path = os.path.join(task_base_path,run_id,'output')
+        
+        #Create algorithm's input and token files before creating volume mounts with them (relative to the node's file system: POD or host)
         self._create_io_files(
             alg_input_file_path=_input_file_path,
             docker_input=docker_input,
@@ -438,47 +452,56 @@ class ContainerManager:
             output_file_path=_output_file_path
         )
 
+
+        # Binding the required files and folders to the Job POD as HostPathVolume (using actual host path folder 
+        # as this is made by the K8S server).
+
+        host_task_base_path = self.v6_config['task_dir']
+
+        _host_input_file_path = os.path.join(host_task_base_path,run_id,'input')
+        _host_token_file_path = os.path.join(host_task_base_path,run_id,'token')
+        _host_output_file_path = os.path.join(host_task_base_path,run_id,'output')
+        _host_tmp_folder_path = os.path.join(host_task_base_path,run_id,'tmp')
+
         # Define a volume for input/output for this run. Following v6 convention, this is a volume bind to a
         # sub-folder created for the given run_id (i.e., the content will be shared by all the
         # algorithm instances of the same 'run' within this node).
 
         # Files or folders will be automatically created as described on https://kubernetes.io/docs/concepts/storage/volumes/#hostpath-volume-types
 
-
-        ##### Volume for the output file (this creates an empty file)
-        
+        ##### Volume for the output file (this creates an empty file)        
         output_volume = client.V1Volume(
             name=f'task-{run_id}-output',                    
-            host_path=client.V1HostPathVolumeSource(path=_output_file_path),
+            host_path=client.V1HostPathVolumeSource(path=_host_output_file_path),
         )
         volumes.append(output_volume)
         # Volume mount path for i/o data (/app is the WORKDIR path of v6-node's container)
         output_volume_mount = client.V1VolumeMount(
             #standard containers volume mount location
             name=f'task-{run_id}-output',
-            mount_path='/app/output',
+            mount_path=pod_job_constants.JOB_POD_OUTPUT_PATH,
         )
 
         vol_mounts.append(output_volume_mount)
-        io_env_vars.append(client.V1EnvVar(name="OUTPUT_FILE", value='/app/output'))
+        io_env_vars.append(client.V1EnvVar(name="OUTPUT_FILE", value=pod_job_constants.JOB_POD_OUTPUT_PATH))
 
         ##### Volume for the INPUT file (this creates an empty file, in which the input parameters user by the algorithm
         # will be written before starting the task.
 
         alg_input_volume = client.V1Volume(
             name=f'task-{run_id}-input',                    
-            host_path=client.V1HostPathVolumeSource(path=_input_file_path),
+            host_path=client.V1HostPathVolumeSource(path=_host_input_file_path),
         )
         volumes.append(alg_input_volume)
                 
         alg_input_volume_mount = client.V1VolumeMount(
             #standard containers volume mount location
             name=f'task-{run_id}-input',
-            mount_path='/app/input'            
+            mount_path=pod_job_constants.JOB_POD_INPUT_PATH
         )
 
         vol_mounts.append(alg_input_volume_mount)
-        io_env_vars.append(client.V1EnvVar(name="INPUT_FILE", value='/app/input'))
+        io_env_vars.append(client.V1EnvVar(name="INPUT_FILE", value=pod_job_constants.JOB_POD_INPUT_PATH))
 
 
         ####### Volume and volume mount for the TOKEN file. This creates an empty file first, 
@@ -486,37 +509,37 @@ class ContainerManager:
 
         token_volume = client.V1Volume(
             name=f'token-{run_id}-input',                    
-            host_path=client.V1HostPathVolumeSource(path=_token_file_path),
+            host_path=client.V1HostPathVolumeSource(path=_host_token_file_path),
         )
         volumes.append(token_volume)
                 
         token_volume_mount = client.V1VolumeMount(
             #standard containers volume mount location
             name=f'token-{run_id}-input',
-            mount_path='/app/token'            
+            mount_path=pod_job_constants.JOB_POD_TOKEN_PATH
         )
 
         vol_mounts.append(token_volume_mount)
-        io_env_vars.append(client.V1EnvVar(name="TOKEN_FILE", value='/app/token'))
+        io_env_vars.append(client.V1EnvVar(name="TOKEN_FILE", value=pod_job_constants.JOB_POD_TOKEN_PATH))
 
 
         ######## Volume for temporal data folder        
         tmp_volume = client.V1Volume(
             name=f'task-{run_id}-tmp',
-            host_path=client.V1HostPathVolumeSource(path=os.path.join(self.v6_config['task_dir'],run_id,'tmp')),
+            host_path=client.V1HostPathVolumeSource(path=_host_tmp_folder_path),
         )
 
         volumes.append(tmp_volume)
 
         tmp_volume_mount = client.V1VolumeMount(
             #standard containers volume mount location
-            mount_path='/app/tmp',
-            name=f'task-{run_id}-tmp'
+            name=f'task-{run_id}-tmp',
+            mount_path=pod_job_constants.JOB_POD_TMP_FOLDER_PATH
         )
 
         vol_mounts.append(tmp_volume_mount)
 
-        io_env_vars.append(client.V1EnvVar(name="TEMPORARY_FOLDER", value='/app/tmp'))
+        io_env_vars.append(client.V1EnvVar(name="TEMPORARY_FOLDER", value=pod_job_constants.JOB_POD_TMP_FOLDER_PATH))
 
 
         ##### Environment variable with the labels of the databases to be used
@@ -795,11 +818,12 @@ class ContainerManager:
 
         """
         if self.running_on_guest_env:
-            #Running within a POD:
-            raise Exception("Getting results from a Node running within a POD: not yet implemented")
+            #Running within a POD: use the standard tasks folder path mapped to the POD-container's file system.
+            #@precondition: 
+            #  node_constants.TASK_FILES_ROOT is mapped to the path defined in the vantge6 configuration file (task_dir)
+            succeded_job_output_file = os.path.join(pod_node_constants.TASK_FILES_ROOT,job_id,'output')
         else:
-            #Running from the host (e.g., for testing purposes) 
-            # TODO the output path should be defined in a single place
+            #Running from the host (e.g., for testing purposes) - use the path defined in the configuration file            
             succeded_job_output_file = os.path.join(self.v6_config['task_dir'],job_id,'output')
             
         self.log.info(f"Reading data generated by job {job_id} at {succeded_job_output_file}")          
