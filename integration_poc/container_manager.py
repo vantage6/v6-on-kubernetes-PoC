@@ -11,8 +11,8 @@ from typing import NamedTuple
 from enum import Enum
 from pathlib import Path
 
-import node_constants
-import jobpod_constants
+import pod_node_constants
+import pod_job_constants
 import re
 import os
 import yaml
@@ -99,11 +99,11 @@ class ContainerManager:
             #pprint.pp(self.v6_config)          
         
         #Instanced within a pod
-        elif os.path.exists(node_constants.KUBE_CONFIG_FILE_PATH):
+        elif os.path.exists(pod_node_constants.KUBE_CONFIG_FILE_PATH):
 
             self.running_on_guest_env = True
             #Default mount location defined on POD configuration                
-            config.load_kube_config(node_constants.KUBE_CONFIG_FILE_PATH)            
+            config.load_kube_config(pod_node_constants.KUBE_CONFIG_FILE_PATH)            
             self.log.info('>>> Loading K8S configuration file from a hostPath volume (Node running within a POD)')
         
         # before a task is executed it gets exposed to these policies
@@ -434,7 +434,7 @@ class ContainerManager:
 
         # If running whithin the POD, use the tas
         if (self.running_on_guest_env):        
-            task_base_path = node_constants.TASK_FILES_ROOT
+            task_base_path = pod_node_constants.TASK_FILES_ROOT
         # If running withn the host, use the value defined by the v6-config file
         else:            
             task_base_path = self.v6_config['task_dir']
@@ -479,11 +479,11 @@ class ContainerManager:
         output_volume_mount = client.V1VolumeMount(
             #standard containers volume mount location
             name=f'task-{run_id}-output',
-            mount_path='/app/output',
+            mount_path=pod_job_constants.JOB_POD_OUTPUT_PATH,
         )
 
         vol_mounts.append(output_volume_mount)
-        io_env_vars.append(client.V1EnvVar(name="OUTPUT_FILE", value='/app/output'))
+        io_env_vars.append(client.V1EnvVar(name="OUTPUT_FILE", value=pod_job_constants.JOB_POD_OUTPUT_PATH))
 
         ##### Volume for the INPUT file (this creates an empty file, in which the input parameters user by the algorithm
         # will be written before starting the task.
@@ -497,11 +497,11 @@ class ContainerManager:
         alg_input_volume_mount = client.V1VolumeMount(
             #standard containers volume mount location
             name=f'task-{run_id}-input',
-            mount_path='/app/input'            
+            mount_path=pod_job_constants.JOB_POD_INPUT_PATH
         )
 
         vol_mounts.append(alg_input_volume_mount)
-        io_env_vars.append(client.V1EnvVar(name="INPUT_FILE", value='/app/input'))
+        io_env_vars.append(client.V1EnvVar(name="INPUT_FILE", value=pod_job_constants.JOB_POD_INPUT_PATH))
 
 
         ####### Volume and volume mount for the TOKEN file. This creates an empty file first, 
@@ -516,11 +516,11 @@ class ContainerManager:
         token_volume_mount = client.V1VolumeMount(
             #standard containers volume mount location
             name=f'token-{run_id}-input',
-            mount_path='/app/token'            
+            mount_path=pod_job_constants.JOB_POD_TOKEN_PATH
         )
 
         vol_mounts.append(token_volume_mount)
-        io_env_vars.append(client.V1EnvVar(name="TOKEN_FILE", value='/app/token'))
+        io_env_vars.append(client.V1EnvVar(name="TOKEN_FILE", value=pod_job_constants.JOB_POD_TOKEN_PATH))
 
 
         ######## Volume for temporal data folder        
@@ -533,13 +533,13 @@ class ContainerManager:
 
         tmp_volume_mount = client.V1VolumeMount(
             #standard containers volume mount location
-            mount_path='/app/tmp',
-            name=f'task-{run_id}-tmp'
+            name=f'task-{run_id}-tmp',
+            mount_path=pod_job_constants.JOB_POD_TMP_FOLDER_PATH
         )
 
         vol_mounts.append(tmp_volume_mount)
 
-        io_env_vars.append(client.V1EnvVar(name="TEMPORARY_FOLDER", value='/app/tmp'))
+        io_env_vars.append(client.V1EnvVar(name="TEMPORARY_FOLDER", value=pod_job_constants.JOB_POD_TMP_FOLDER_PATH))
 
 
         ##### Environment variable with the labels of the databases to be used
@@ -821,7 +821,7 @@ class ContainerManager:
             #Running within a POD: use the standard tasks folder path mapped to the POD-container's file system.
             #@precondition: 
             #  node_constants.TASK_FILES_ROOT is mapped to the path defined in the vantge6 configuration file (task_dir)
-            succeded_job_output_file = os.path.join(node_constants.TASK_FILES_ROOT,job_id,'output')
+            succeded_job_output_file = os.path.join(pod_node_constants.TASK_FILES_ROOT,job_id,'output')
         else:
             #Running from the host (e.g., for testing purposes) - use the path defined in the configuration file            
             succeded_job_output_file = os.path.join(self.v6_config['task_dir'],job_id,'output')
