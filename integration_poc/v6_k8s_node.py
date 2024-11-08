@@ -35,6 +35,7 @@ import pprint
 import datetime
 import sys
 import threading
+import node_constants
 
 # Based on https://github.com/vantage6/vantage6/blob/be2e82b33e68db74304ea01c778094e6b40e671a/vantage6-node/vantage6/node/__init__.py#L1
 
@@ -451,9 +452,9 @@ class NodePod:
                 #defined in the config file.
                 #if the node is running within a POD, by convention 
                 # (see kubeconfs/node_pod_config.yaml), the uri is the
-                # same with the prefix: /app/.databases/
+                # same with the prefix defined in node_constants.V6_NODE_DATABASE_BASE_PATH
                 if self.k8s_container_manager.running_on_guest_env:                    
-                    col_names[f"columns_{label}"] = get_csv_column_names(os.path.join("/app/.databases/", csv_path.lstrip('/')))
+                    col_names[f"columns_{label}"] = get_csv_column_names(os.path.join(node_constants.V6_NODE_DATABASE_BASE_PATH, csv_path.lstrip('/')))
                 else:
                     col_names[f"columns_{label}"] = get_csv_column_names(csv_path)
         config_to_share["database_labels"] = labels
