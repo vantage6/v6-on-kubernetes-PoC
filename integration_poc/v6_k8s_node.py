@@ -187,7 +187,7 @@ class NodePod:
         #os.environ["PROXY_SERVER_HOST"] = proxy_host
 
         #proxy_port = int(os.environ.get("PROXY_SERVER_PORT", 8080))
-        proxy_port = 4567
+        proxy_port = pod_node_constants.V6_NODE_PROXY_PORT
 
         """
         try:

@@ -18,7 +18,7 @@ metadata:
 spec:
  hostname: v6-node-pod       # a better name yet to be defined
  subdomain: v6-pod-subdomain # => POD FQDN: v6-node-pod.v6-pod-subdomain.v6-node
- hostAliases:                
+ hostAliases:      # only needed when working within a tailnet network          
  - ip: "10.2.67.147"
    hostnames:
    - "v6-server.tail984a0.ts.net"
@@ -27,14 +27,14 @@ spec:
    image: docker.io/hcadavidescience/v6_k8s_node:latest
    tty: true
    ports: 
-   - containerPort:  5000
+   - containerPort:  4567
    env:
    - name: HOST_IP
      valueFrom:
        fieldRef:
          fieldPath: status.hostIP
-   - name: PORT
-     value: "5000"
+   - name: PORT   # TODO check if this is necessary
+     value: "4567" 
    command: ["python", "v6_k8s_node.py"]
    volumeMounts:
    - name: task-files-root
