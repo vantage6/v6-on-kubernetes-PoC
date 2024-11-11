@@ -26,6 +26,8 @@ spec:
  - name: v6-node-server
    image: docker.io/hcadavidescience/v6_k8s_node:latest
    tty: true
+   ports: 
+   - containerPort:  5000
    env:
    - name: HOST_IP
      valueFrom:
@@ -57,3 +59,17 @@ spec:
  - name: v6-node-default-database
    hostPath:
      path: /home/hcadavid/k8s/v6-on-kubernetes-PoC/csv/employees.csv
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: v6proxy-subdomain
+  namespace: v6-node
+spec:
+  selector:
+    app: v6-node-pod
+  ports:
+  - protocol: TCP
+    port:  5000
+    targetPort:  5000
