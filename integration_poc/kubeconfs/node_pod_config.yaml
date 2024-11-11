@@ -29,7 +29,7 @@ spec:
    ports: 
    - containerPort:  4567
    env:
-   - name: HOST_IP
+   - name: HOST_IP # TODO check if this is necessary
      valueFrom:
        fieldRef:
          fieldPath: status.hostIP
@@ -71,5 +71,5 @@ spec:
     app: v6-node-pod
   ports:
   - protocol: TCP
-    port:  5000
-    targetPort:  5000
+    port:  4567
+    targetPort:  4567
