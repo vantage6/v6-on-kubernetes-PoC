@@ -11,10 +11,10 @@ metadata:
 
 ---
 
-kind: NetworkPolicy
+kind: NetworkPolicy # Policy to disable job's networking, except with the Node
 apiVersion: networking.k8s.io/v1
 metadata:
-  name: v6-jobs-allow-egress-to-proxy-only
+  name: v6-jobs-allow-egress-to-node-proxy-only
   namespace: v6-jobs
 spec:
   podSelector: {} # This selects all pods in the v6-jobs namespace
@@ -22,12 +22,15 @@ spec:
   - Egress
   egress:
   - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: v6-node # the pod is in a different namespace
     - podSelector:
         matchLabels:
-          app: dummy-v6-proxy # This targets the dummy-v6-proxy pod
+          app: v6-node-pod # This targets the v6-node-pod
     ports:
     - protocol: TCP
-      port:  8080 # Assuming the dummy-v6-proxy pod listens on port  8080
+      port:  5000 # Port exposed by default by the Node's server proxy
   - to:
     - namespaceSelector: {} # allow only the use DNS within the cluster
     ports:
@@ -37,16 +40,20 @@ spec:
 ---
 
 apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+kind: NetworkPolicy #network policy to allow outbound traffic from the node
 metadata:
   name: v6-proxy-allow-internet-egress
-  namespace: v6-jobs
+  namespace: v6-node
 spec:
   podSelector:
     matchLabels:
-      app: dummy-v6-proxy
+      app: v6-node-pod
   policyTypes:
   - Egress
   egress:
   - {} # This rule allows egress traffic to any destination (could be restricted to the V6-server only)
+
+
+
+
 

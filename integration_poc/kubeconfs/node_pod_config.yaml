@@ -16,9 +16,9 @@ metadata:
  name: v6-node-pod
  namespace: v6-node
 spec:
- hostname: v6-node-proxy
- subdomain: poc
- hostAliases:
+ hostname: v6-node-pod       # a better name yet to be defined
+ subdomain: v6-pod-subdomain # => POD FQDN: v6-node-pod.v6-pod-subdomain.v6-node
+ hostAliases:                
  - ip: "10.2.67.147"
    hostnames:
    - "v6-server.tail984a0.ts.net"
