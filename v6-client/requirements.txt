@@ -18,5 +18,5 @@ requests==2.32.3
 schema==0.7.5
 six==1.16.0
 urllib3==2.2.1
-vantage6-client==4.5.5
-vantage6-common==4.5.5
+vantage6-client==4.7.0
+vantage6-common==4.7.0

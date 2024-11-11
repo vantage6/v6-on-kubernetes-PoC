@@ -16,7 +16,7 @@ input_ = {
 
 average_task = client.task.create(
    collaboration=1,
-   organizations=[2],
+   organizations=[4],
    name="poc_model",
    image="hcadavidescience/poc_model_training",
    description='',
