@@ -23,37 +23,30 @@ spec:
   policyTypes:
   - Egress
   egress:
-  - to:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: v6-node-pod
-          kubernetes.io/metadata.namespace: v6-node 
-    ports:
-    - protocol: TCP
-      port:  4567 # Port exposed by default by the Node's server proxy
-  - to:
-    - namespaceSelector: {} # allow only the use DNS within the cluster
-    ports:
-    - protocol: UDP #This enables internal DNS resolution (otherwhise the static IP addresses of the proxy should be given)
-      port: 53
-
----
-
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy #network policy to allow outbound traffic from the node
-metadata:
-  name: v6-proxy-allow-internet-egress
-  namespace: v6-node
-spec:
-  podSelector:
-    matchLabels:
-      app: v6-node-pod
-  policyTypes:
-  - Egress
-  egress:
-  - {} # This rule allows egress traffic to any destination (could be restricted to the V6-server only)
+  - {}
+#  - to:
+#    - podSelector:
+#        matchLabels:
+#          app: v6-node-server-proxy # This targets the dummy-v6-proxy pod
+#    ports:
+#    - protocol: TCP
+#      port:  4567 
+#  - to:
+#    - namespaceSelector: {} # allow only the use DNS within the cluster
+#    ports:
+#    - protocol: UDP #This enables internal DNS resolution (otherwhise the static IP addresses of the proxy should be given)
+#      port: 53
 
 
+
+#spec:
+#  podSelector:
+#    matchLabels:
+#      app: v6-node-server-proxy
+#  policyTypes:
+#  - Egress
+#  egress:
+#  - {} # This rule allows egress traffic to any destination (could be restricted to the V6-server only)
 
 
 

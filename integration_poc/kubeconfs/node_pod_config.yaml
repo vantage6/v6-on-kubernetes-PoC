@@ -14,7 +14,9 @@ apiVersion: v1
 kind: Pod
 metadata:
  name: v6-node-pod
- namespace: v6-node
+ namespace: v6-jobs
+ labels:
+   app: v6-node-server-proxy
 spec:
  hostname: v6-node-pod       # a better name yet to be defined
  subdomain: v6-pod-subdomain # => POD FQDN: v6-node-pod.v6-pod-subdomain.v6-node
@@ -65,11 +67,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: v6proxy-subdomain
-  namespace: v6-node
+  namespace: v6-jobs
 spec:
   selector:
-    app: v6-node-pod
+    app: v6-node-server-proxy
   ports:
   - protocol: TCP
     port:  4567
     targetPort:  4567
+
