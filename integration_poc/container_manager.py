@@ -247,7 +247,9 @@ class ContainerManager:
         env_vars: List[V1EnvVar] = [            
             client.V1EnvVar(name="HOST", value=os.environ.get("PROXY_SERVER_HOST",pod_node_constants.V6_NODE_FQDN)),
             client.V1EnvVar(name="PORT", value=os.environ.get("PROXY_SERVER_PORT", str(pod_node_constants.V6_NODE_PROXY_PORT))),
-            client.V1EnvVar(name="API_PATH", value=self.v6_config['api_path']),
+            client.V1EnvVar(name="API_PATH", value=""),
+            #TODO still not clear why, when including the API path, the algorithm's client use it twice: /api/api
+            #client.V1EnvVar(name="API_PATH", value=self.v6_config['api_path']),
         ]
         
         env_vars.extend(_io_related_env_variables)
