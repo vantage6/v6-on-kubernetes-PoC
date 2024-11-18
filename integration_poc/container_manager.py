@@ -234,7 +234,7 @@ class ContainerManager:
 
         str_task_id = str(task_info["id"])
         str_run_id  = str(run_id)
-        parent_id = get_parent_id(task_info)
+        parent_id = str(get_parent_id(task_info))
         
         _io_related_env_variables: List[V1EnvVar]
 
