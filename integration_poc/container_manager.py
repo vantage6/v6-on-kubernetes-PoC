@@ -234,7 +234,7 @@ class ContainerManager:
 
         str_task_id = str(task_info["id"])
         str_run_id  = str(run_id)
-        parent_id = get_parent_id(task_info)
+        parent_id = str(get_parent_id(task_info))
         
         _io_related_env_variables: List[V1EnvVar]
 
@@ -242,13 +242,15 @@ class ContainerManager:
         
         # Setting the environment variables required by V6 algorithms.
         #   As these environment variables are used within the container/POD environment, file paths are relative 
-        #   to the mount paths (i.e., the container's file system) created by the method above (_crate_volume_mounts)
+        #   to the mount paths (i.e., the container's file system) created by the method _crate_volume_mounts
         #   
-        env_vars: List[V1EnvVar] = [
-                                                        #TODO Replace xxxxx with the FQDN of the proxy
-            client.V1EnvVar(name="HOST", value=os.environ.get("PROXY_SERVER_HOST","xxxxxxxxxx")),
-            client.V1EnvVar(name="PORT", value=os.environ.get("PROXY_SERVER_PORT", '8080')),
-            client.V1EnvVar(name="API_PATH", value=''),
+        env_vars: List[V1EnvVar] = [            
+            client.V1EnvVar(name="HOST", value=os.environ.get("PROXY_SERVER_HOST",pod_node_constants.V6_NODE_FQDN)),
+            client.V1EnvVar(name="PORT", value=os.environ.get("PROXY_SERVER_PORT", str(pod_node_constants.V6_NODE_PROXY_PORT))),
+            #TODO This environment variable correspond to the API PATH of the PROXY (not to be confused of the one of the
+            # actual server). This variable should be eventually removed, as it is not being used to setup such PATH, so if
+            # it is changed to a value different than empty, it leads to an error.
+            client.V1EnvVar(name="API_PATH", value=""),    
         ]
         
         env_vars.extend(_io_related_env_variables)

@@ -14,11 +14,13 @@ apiVersion: v1
 kind: Pod
 metadata:
  name: v6-node-pod
- namespace: v6-node
+ namespace: v6-jobs
+ labels:
+   app: v6-node-server-proxy
 spec:
- hostname: v6-node-proxy
- subdomain: poc
- hostAliases:
+ hostname: v6-node-pod       # a better name yet to be defined
+ subdomain: v6-pod-subdomain # => POD FQDN: v6-node-pod.v6-pod-subdomain.v6-node
+ hostAliases:      # only needed when working within a tailnet network          
  - ip: "10.2.67.147"
    hostnames:
    - "v6-server.tail984a0.ts.net"
@@ -26,13 +28,15 @@ spec:
  - name: v6-node-server
    image: docker.io/hcadavidescience/v6_k8s_node:latest
    tty: true
+   ports: 
+   - containerPort:  4567
    env:
-   - name: HOST_IP
+   - name: HOST_IP # TODO check if this is necessary
      valueFrom:
        fieldRef:
          fieldPath: status.hostIP
-   - name: PORT
-     value: "5000"
+   - name: PORT   # TODO check if this is necessary
+     value: "4567" 
    command: ["python", "v6_k8s_node.py"]
    volumeMounts:
    - name: task-files-root
@@ -57,3 +61,18 @@ spec:
  - name: v6-node-default-database
    hostPath:
      path: /home/hcadavid/k8s/v6-on-kubernetes-PoC/csv/employees.csv
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: v6proxy-subdomain
+  namespace: v6-jobs
+spec:
+  selector:
+    app: v6-node-server-proxy
+  ports:
+  - protocol: TCP
+    port:  4567
+    targetPort:  4567
+
