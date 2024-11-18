@@ -2,6 +2,9 @@
 
 This repository contains a proof of concept for refactoring the Node component of Vantage6, particularly focusing on how it handles containerized algorithms.
 
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/3J_fq4cn-Ds/0.jpg)](https://www.youtube.com/watch?v=3J_fq4cn-Ds)
+
+
 ## About vantage6 and containers management
 
 [vantage6](https://distributedlearning.ai/) is a federated learning platform designed to facilitate privacy-preserving analysis without sharing sensitive data. The current architecture involves a central server, nodes, and clients. Nodes are responsible for executing algorithms on local data and securely communicating the results back to the server.
@@ -47,4 +50,6 @@ This is an implementation of a simplified version of the vantage6 client/server 
 An implementation of a V6 node intended to work as a regular (Docker-based) V6 node, but working with a K8S cluster under the hood. It is based and built on top of the experiments made with the architecture proof of concept.
 
 [Integration proof of concept guidelines](integration_poc/integration_poc.md)
+
+
 
