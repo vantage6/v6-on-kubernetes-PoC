@@ -138,7 +138,7 @@ The codebase on the `integration_poc` folder is an implementation of a V6 node i
 ![alt text](img/node-pod-logs.png)
 
 
-14. Request the execution of the **partial** part of a V6 algorithm on the vantage6 server (the networking settings between the algorithms and the node-proxy is still in progress). You can do this using the web-based user interface, or the python client. Reload the logs from Step #13 to verify how after this execution request is received, a new Job POD is created:
+14. Request the execution of a V6 algorithm on the vantage6 server. You can do this using the web-based user interface, or the python client. Reload the logs from Step #13 to verify how after this execution request is received, a new Job POD is created:
 
 	![alt text](img/request_n_result_log.png)
 

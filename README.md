@@ -1,8 +1,6 @@
 # vantage6 on Kubernetes proof of concept
 
-This repository contains a proof of concept for refactoring the Node component of Vantage6, particularly focusing on how it handles containerized algorithms.
-
-[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/3J_fq4cn-Ds/0.jpg)](https://www.youtube.com/watch?v=3J_fq4cn-Ds)
+This repository contains a proof of concept for refactoring the Node component of Vantage6, particularly focusing on how it handles containerized algorithms (see [the related paper](https://ebooks.iospress.nl/doi/10.3233/SHTI240729))
 
 
 ## About vantage6 and containers management
@@ -38,18 +36,20 @@ The following diagram depicts the alternative K8S-based architecture envisioned 
 
 The work on this envisioned architecture involves two separate projects included in this repository:
 
-### Architecture proof of concept
+### Integration proof of concept (integration_poc/)
 
-This is an implementation of a simplified version of the vantage6 client/server architecture. It is intended to be used to perform experiments for making design decisions (being the integration with K8S the most important one) without dealing with the complex V6 codebase.
+A K8S-based reimplementation of the vantage6 node, that can be used seamlessly within a vantage6 collaboration with other conventional nodes. Follow the [integration proof of concept guidelines](integration_poc/integration_poc.md) to set up your own node.
 
-[Architecture proof of concept guidelines](node_poc/node_poc.md)
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/3J_fq4cn-Ds/0.jpg)](https://www.youtube.com/watch?v=3J_fq4cn-Ds)
+
+Screen cast of a federated analysis in a collaboration combining a K8S-based node and a regular one.
 
 
-### Integration proof of concept
+### Architecture proof of concept (node_poc/)
 
-An implementation of a V6 node intended to work as a regular (Docker-based) V6 node, but working with a K8S cluster under the hood. It is based and built on top of the experiments made with the architecture proof of concept.
+An implementation of a simplified version of the vantage6 client/server architecture used for performing experiments in the refactoring of the `docker-manager` module (from now on called `container-manager`) without dealing with the complex V6 codebase. [See setup guidelines](node_poc/node_poc.md)
 
-[Integration proof of concept guidelines](integration_poc/integration_poc.md)
+
 
 
 
