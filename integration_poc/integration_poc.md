@@ -18,8 +18,10 @@ The codebase on the `integration_poc` folder is an implementation of a V6 node i
 - [x] Launching a V6-algorithm (tested through the kubernetes dashboard)
 - [X] Listening for task finalization (implemented onthe PoC, adaptation is required)
 - [X] Launching the node and the proxy as a POD
-- [X] Reporting the results back to the server properly 
-- [ ] Applying the networking policies as it was done on the PoC, enabling the proxy for the algorithms to reach the server.
+- [X] Reporting the results back to the server properly
+- [X] Making the NODE Proxy reachable by the Job-PODs (the ones running the algorithms) using a FQDN
+- [X] Running both central and partial functions with other K8S and regular nodes.
+- [ ] Isolating jobs-pods: applying the networking policies as it was done on the PoC
 - [ ] Encrypted data exchange
 - [ ] Handling multiple K8S status (see reported issues)
 - [ ] + Other features yet to be explored through the architectural proof of concept
