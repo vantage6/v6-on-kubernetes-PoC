@@ -52,6 +52,7 @@ spec:
  - name: task-files-root
    hostPath:
      path: /tmp/tasks
+     type: DirectoryOrCreate
  - name: kube-config-file
    hostPath:
      path: /home/hcadavid/.kube/config   
