@@ -2,10 +2,13 @@ name: Build and Push Multi-Architecture Image
 
 on:
   push:
-    branches: [ hcadavid-ghaction ]
+    branches: [ main ]
+    paths:
+      - 'integration_poc/**/*.py'
   pull_request:
     branches: [ main ]
-
+    paths:
+      - 'integration_poc/**/*.py'
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
