@@ -74,9 +74,6 @@ The codebase on the `integration_poc` folder is an implementation of a V6 node i
 	task_dir: /<ouput_path>/tasks
 	```
 
-> [!IMPORTANT]
-> Do create the task folder on the machine where the v6 node will run. If you don't do this, Kubernetes will create it with root as the owner, which will cause problems as the JOB PODs don't have root privileges for creating sub-folders on it.
-
 7.  Edit the [Kubernetes YAML configuration file](kubeconfs/node_pod_config.yaml) used for launching the Node as a POD:
 
 	- Add the reference to the v6 node image (e.g., in Dockerhub) created in Step #5.
@@ -113,6 +110,7 @@ The codebase on the `integration_poc` folder is an implementation of a V6 node i
 	- name: task-files-root
 	  hostPath:
 	    path: ABSOLUTE_HOST_PATH_OF_THE_TASK_FOLDER
+        type: DirectoryOrCreate
 	```
 
 	- Add the absolute path of the kubernetes configuration file. This integration PoC has been tested with Ubuntu server 22.04 and MicroK8S, where such configuration file is by default on `/home/<user_name>/.kube/config`.
