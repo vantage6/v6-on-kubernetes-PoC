@@ -2,7 +2,7 @@ name: Build and Push Multi-Architecture Image
 
 on:
   push:
-    branches: [ main ]
+    branches: [ hcadavid-ghaction ]
   pull_request:
     branches: [ main ]
 
