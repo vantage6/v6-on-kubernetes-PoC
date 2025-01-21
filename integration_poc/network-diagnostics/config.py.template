@@ -1,0 +1,11 @@
+# config.py
+
+server_url = "" 
+                                          
+server_port = 443 # This is specified when you first created the server
+server_api = "/api" # This is specified when you first created the server
+
+username = ""
+password = ""
+
+organization_key = "/path/to/your/private/key.pem" # This can be empty if you do not want to set up encryption
