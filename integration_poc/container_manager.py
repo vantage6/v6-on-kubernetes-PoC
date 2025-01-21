@@ -109,6 +109,7 @@ class ContainerManager:
         # before a task is executed it gets exposed to these policies
         self._policies = self._setup_policies(config)
 
+
         # K8S Batch API instance
         self.batch_api = client.BatchV1Api()
         # K8S Core API instance
@@ -278,7 +279,7 @@ class ContainerManager:
             metadata=job_metadata,
             spec=client.V1JobSpec(
                 template=client.V1PodTemplateSpec(
-                    metadata=client.V1ObjectMeta(labels={"app": str_run_id}),
+                    metadata=client.V1ObjectMeta(labels={"app": str_run_id,"role":"v6_alg_runner"}),
                     spec=client.V1PodSpec(
                         containers=[container],
                         volumes=_volumes,
