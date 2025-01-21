@@ -39,11 +39,14 @@ spec:
     - protocol: TCP
       port:  4567 
   - to:
-    - namespaceSelector: {} # allow only the use DNS within the cluster
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
     ports:
-    - protocol: UDP #This enables internal DNS resolution (otherwhise the static IP addresses of the proxy should be given)
+    - protocol: UDP
       port: 53
-
+    - protocol: TCP
+      port: 53
 ---
 
 # Policies for the node POD 
