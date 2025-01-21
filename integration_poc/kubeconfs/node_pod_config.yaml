@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -17,13 +18,14 @@ metadata:
  namespace: v6-jobs
  labels:
    app: v6-node-server-proxy
+   role: v6-node
 spec:
  hostname: v6-node-pod       # a better name yet to be defined
  subdomain: v6-pod-subdomain # => POD FQDN: v6-node-pod.v6-pod-subdomain.v6-node
  hostAliases:      # only needed when working within a tailnet network
- - ip: "10.2.67.147"
+ - ip: "10.2.67.221"
    hostnames:
-   - "v6-server.tail984a0.ts.net"
+   - "v6-rserver.tail984a0.ts.net"
  containers:
  - name: v6-node-server
    image: docker.io/hcadavidescience/v6_k8s_node:latest
